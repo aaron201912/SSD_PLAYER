@@ -62,7 +62,6 @@ protected:
 
 			if (isWifiEnable && wlanHdl != -1)
 			{
-				checkProfile();
 				printf("conn param: id=%d, ssid=%s, passwd=%s\n", wlanHdl, (char*)pConnParam->au8SSId, (char*)pConnParam->au8Password);
 				MI_WLAN_Connect(&wlanHdl, pConnParam); // save after connect
 				printf("save conn param: id=%d, ssid=%s, passwd=%s\n", wlanHdl);
@@ -119,6 +118,12 @@ static void onUI_init(){
 
 #ifdef SUPPORT_WLAN_MODULE
 	// get wifi status from config file
+	if (checkProfile() < 0)
+	{
+		printf("wlan config files error\n");
+		return;
+	}
+
 	initWifiConfig();
 	isWifiSupport = getWifiSupportStatus();
 	isWifiEnable = getWifiEnableStatus();
@@ -126,7 +131,7 @@ static void onUI_init(){
 
 	if (isWifiSupport)
 	{
-		wifiSetupThread.setCycleCnt(20, 500);
+		wifiSetupThread.setCycleCnt(200, 50);
 		printf("wifiSetupThread run\n");
 		wifiSetupThread.run("wifiSetup");
 	}
@@ -161,6 +166,23 @@ static bool onUI_Timer(int id){
 
 static bool onmainActivityTouchEvent(const MotionEvent &ev) {
     // 返回false触摸事件将继续传递到控件上，返回true表示该触摸事件在此被拦截了，不再传递到控件上
+	//ZKListView::ZKListSubItem *pNameItem = mListview_indicatorPtr->findSubItemByID(ID_NETWORKSETTING_SubItemNetworkID);
+	switch (ev.mActionStatus) {
+		case MotionEvent::E_ACTION_DOWN://触摸按下
+			//printf("down: x=%d, y=%d\n", ev.mX, ev.mY);
+
+			break;
+		case MotionEvent::E_ACTION_MOVE://触摸滑动
+			//printf("move: x=%d, y=%d\n", ev.mX, ev.mY);
+
+			break;
+		case MotionEvent::E_ACTION_UP:  //触摸抬起
+			//printf("up: x=%d, y=%d\n", ev.mX, ev.mY);
+			break;
+		default:
+			break;
+	}
+
     return false;
 }
 const char* IconTab[]={
@@ -224,7 +246,7 @@ static void onSlideItemClick_Slidewindow1(ZKSlideWindow *pSlideWindow, int index
 static void onSlidePageChange_Slidewindow1(ZKSlideWindow *pSlideWindow, int page) {
 	int totalPage = pSlideWindow->getPageSize();
 	g_curPageIdx = pSlideWindow->getCurrentPage();
-	printf("Logic: param page is %d, total page is %d, cur page is %d\n", page, totalPage, g_curPageIdx);
+	//printf("Logic: param page is %d, total page is %d, cur page is %d\n", page, totalPage, g_curPageIdx);
 	mListview_indicatorPtr->refreshListView();
 }
 
@@ -244,7 +266,7 @@ static void obtainListItemData_Listview_indicator(ZKListView *pListView,ZKListVi
 static void onListItemClick_Listview_indicator(ZKListView *pListView, int index, int id) {
     //LOGD(" onListItemClick_ Listview_indicator  !!!\n");
 	int curPageIdx =  g_curPageIdx;
-	printf("click idx is %d, curPageIdx is %d\n", index, g_curPageIdx);
+	//printf("click idx is %d, curPageIdx is %d\n", index, g_curPageIdx);
 
 	while (curPageIdx < index)
 	{

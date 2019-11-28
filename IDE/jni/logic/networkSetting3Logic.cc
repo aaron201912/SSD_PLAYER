@@ -37,6 +37,7 @@
 
 static MI_WLAN_ConnectParam_t stConnectInfo;
 static MI_WLAN_Status_t status;
+static WLAN_HANDLE g_connHdl = -1;		// record connect handle, if connect success, save it to config
 
 class WifiChangeConnThread : public Thread {
 public:
@@ -50,8 +51,27 @@ protected:
 
 			if(status.stStaStatus.state == WPA_COMPLETED)
 			{
+				Wifi_ConnectInfo_t stConn;
+				checkSsidExist((char*)status.stStaStatus.ssid, &stConn);
+				memset(stConn.passwd, 0, sizeof(stConn.passwd));
+				strcpy(stConn.passwd, (char*)stConnectInfo.au8Password);
+
 				printf("wifi connect success: %s %s\n", status.stStaStatus.ip_address, status.stStaStatus.ssid);
 				setConnectionStatus(true);
+
+				// update current ssid & ssid's info, 更新当前ssid和ssid的连接信息
+				if (stConn.index == -1)
+				{
+					stConn.index = g_connHdl;
+					addSsidToApList((char*)status.stStaStatus.ssid);
+					addSsidInfoToConnList((char*)status.stStaStatus.ssid, &stConn);
+				}
+
+				updateCurSsid((char*)status.stStaStatus.ssid);
+				saveWifiConfig();
+				setWlanHandle(g_connHdl);
+				saveConnectParam(&stConnectInfo);
+
 				return false;
 			}
 
@@ -198,20 +218,19 @@ static bool onButtonClick_Buttonbg(ZKButton *pButton) {
 static bool onButtonClick_Button_connect_conn(ZKButton *pButton) {
     //LOGD(" ButtonClick Button_connect_conn !!!\n");
 #ifdef SUPPORT_WLAN_MODULE
-	MI_WLAN_ConnectParam_t *pConnParam = getConnectParam();
-	WLAN_HANDLE wlanHdl = -1;
+	// check if ssid exist, if exist, get handle, else handle is -1
+	Wifi_ConnectInfo_t stConnInfo;
+	checkSsidExist((char*)stConnectInfo.au8SSId, &stConnInfo);
+	g_connHdl = stConnInfo.index;
+	if (g_connHdl != -1)	// if ssid is exist, update connect info
+	{
+		updateConnPasswd((char*)stConnectInfo.au8SSId, (char*)stConnectInfo.au8Password);
+		saveWifiConfig();
+	}
 
-	if (!strcmp((char*)pConnParam->au8SSId, (char*)stConnectInfo.au8SSId))
-		wlanHdl = getWlanHandle();
-
-	printf("conn param: id=%d, ssid=%s, passwd=%s\n", wlanHdl, (char*)pConnParam->au8SSId, (char*)pConnParam->au8Password);
 	setConnectionStatus(false);
-	MI_WLAN_Connect(&wlanHdl, &stConnectInfo);
-	printf("current wlan handle is %d\n", wlanHdl);
-
-	setWlanHandle(wlanHdl);
-	saveConnectParam(&stConnectInfo);
-	saveWifiConfig();
+	MI_WLAN_Connect(&g_connHdl, &stConnectInfo);	// wpa only save successful connection, wifisetting.json is also
+	printf("current wlan handle is %d\n", g_connHdl);
 
 	wifiConnectThread.setCycleCnt(20, 500);
 	wifiConnectThread.run();
