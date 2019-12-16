@@ -523,7 +523,7 @@ static void onUI_intent(const Intent *intentPtr) {
     FileTree_t *pos = NULL;
     // init usb dev
 
-    if (0 != SSTAR_DetectUsbDev((char*)g_udiskPath, sizeof(g_udiskPath)))
+    if (0 != SSTAR_InitUsbDev((char*)g_udiskPath, sizeof(g_udiskPath)))
 	{
     	mTextview_tipsPtr->setVisible(true);
     	mButton_updirPtr->setVisible(false);
@@ -587,6 +587,7 @@ static void onUI_quit() {
 #ifdef SUPPORT_PLAYER_MODULE
 	DestroyFileTree(g_pFileRoot);
 	g_pFileRoot = NULL;
+	SSTAR_DeinitUsbDev();
 #endif
 }
 

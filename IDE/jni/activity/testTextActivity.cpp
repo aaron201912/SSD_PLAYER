@@ -9,7 +9,6 @@ static ZKButton* mButton1Ptr;
 static ZKTextView* mTextview4Ptr;
 static ZKTextView* mTextview3Ptr;
 static ZKTextView* mTextview1Ptr;
-static ZKTextView* mTextpicPtr;
 static ZKTextView* mTextTimePtr;
 static ZKTextView* mTextnormalPtr;
 static testTextActivity* mActivityPtr;
@@ -136,7 +135,6 @@ void testTextActivity::onCreate() {
     mTextview4Ptr = (ZKTextView*)findControlByID(ID_TESTTEXT_Textview4);
     mTextview3Ptr = (ZKTextView*)findControlByID(ID_TESTTEXT_Textview3);
     mTextview1Ptr = (ZKTextView*)findControlByID(ID_TESTTEXT_Textview1);
-    mTextpicPtr = (ZKTextView*)findControlByID(ID_TESTTEXT_Textpic);
     mTextTimePtr = (ZKTextView*)findControlByID(ID_TESTTEXT_TextTime);
     mTextnormalPtr = (ZKTextView*)findControlByID(ID_TESTTEXT_Textnormal);
 	mActivityPtr = this;

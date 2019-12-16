@@ -15,7 +15,6 @@ extern "C"
 #endif
 
 #ifdef SUPPORT_PLAYER_MODULE
-#define SSTAR_DetectUsbDev     SSTAR_InitUsbDev
 
 int SSTAR_InitUsbDev(char *pDirName, int nLen);
 int SSTAR_DeinitUsbDev();

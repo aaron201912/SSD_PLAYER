@@ -31,7 +31,6 @@
 #define ID_TESTTEXT_Textview4    50007
 #define ID_TESTTEXT_Textview3    50006
 #define ID_TESTTEXT_Textview1    50005
-#define ID_TESTTEXT_Textpic    50003
 #define ID_TESTTEXT_TextTime    50002
 #define ID_TESTTEXT_Textnormal    50000
 /*TAG:Macro宏ID END*/

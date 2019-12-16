@@ -3,6 +3,9 @@
  *
  *  Created on: 2019年8月26日
  *      Author: koda.xu
+ *
+ *  该部分为自动mount usb的实现，自动mount usb分区名称为：/tmp/udiskX (X为分区索引，0，1，2...),暂不考虑在下列场景下出现mount分区重名的问题：
+ *  手动mount usb -> 进入播放列表页面 -> 自动mount usb
  */
 
 #ifdef SUPPORT_PLAYER_MODULE
@@ -12,20 +15,27 @@
 #include <stdlib.h>
 #include <sys/bitypes.h>
 #include "usbdetect.h"
+#include "list.h"
 
 
 #define USB_PARTTITION_CHECK                "/proc/partitions"
 #define USB_MOUNT_CHECK                     "/proc/mounts"
 #define USB_FAT32_FORMAT                    "vfat"
 #define USB_NTFS_FORMAT                     "ntfs"
-#define USB_MOUNT_DEFAULT_DIR               "/tmp/udisk"
+#define USB_MOUNT_DEFAULT_DIR               "/vendor"
 
 #define MAX_LINE_LEN        512
 #define MAX_DEV_NAMELEN     256
 
+typedef struct
+{
+	list_t partitionList;
+	char partitionName[MAX_DEV_NAMELEN];
+	char mountName[MAX_DEV_NAMELEN];
+} UsbPartitionInfo_t;
+
+static LIST_HEAD(g_usbPartitionListHead);
 static char g_line[MAX_LINE_LEN];
-static char g_devName[MAX_DEV_NAMELEN];
-static char g_mountName[MAX_DEV_NAMELEN];
 
 static char *freadline(FILE *stream)
 {
@@ -45,8 +55,31 @@ static int DetectUsbDev(void)
     FILE *pFile = fopen(USB_PARTTITION_CHECK, "r");
     char *pCurLine = NULL;
     char *pSeek = NULL;
+    int nRet = -1;
 
-    memset(g_devName, 0, sizeof(g_devName));
+    // refresh disk partition list
+    if (!list_empty(&g_usbPartitionListHead))
+    {
+    	UsbPartitionInfo_t *pos = NULL;
+    	UsbPartitionInfo_t *posN = NULL;
+		list_for_each_entry_safe(pos, posN, &g_usbPartitionListHead, partitionList)
+		{
+			if (strlen(pos->mountName))
+			{
+				char umountCmd[128] = {0};
+				char rmCmd[128] = {0};
+
+				sprintf(umountCmd, "umount %s", pos->mountName);
+				system(umountCmd);
+
+				sprintf(rmCmd, "rm -rf %s", pos->mountName);
+				system(rmCmd);
+			}
+
+			list_del(&pos->partitionList);
+			free(pos);
+		}
+    }
 
     if (pFile)
     {
@@ -57,11 +90,12 @@ static int DetectUsbDev(void)
             {
                 if ((pSeek[2] >= 'a' && pSeek[2] <= 'z') && (pSeek[3] >= '1' && pSeek[3] <= '9'))
                 {
-                    memcpy(g_devName, pSeek, 4);
-                    fclose(pFile);
-                    pFile = NULL;
-
-                    return 0;
+                	UsbPartitionInfo_t *pUsbPartitionInfo = (UsbPartitionInfo_t*)malloc(sizeof(UsbPartitionInfo_t));
+					memset(pUsbPartitionInfo, 0, sizeof(UsbPartitionInfo_t));
+					INIT_LIST_HEAD(&pUsbPartitionInfo->partitionList);
+					memcpy(pUsbPartitionInfo->partitionName, pSeek, 4);
+					list_add_tail(&pUsbPartitionInfo->partitionList, &g_usbPartitionListHead);
+					nRet = 0;
                 }
             }
         }
@@ -70,120 +104,159 @@ static int DetectUsbDev(void)
         pFile = NULL;
     }
 
-    printf("Can't find usb device\n");
-    return -1;
+    if (nRet)
+    	printf("Can't find usb device\n");
+
+    return nRet;
 }
 
-static int CheckUsbDevMountStatus()
+static int GetUsbDevMountStatus()
 {
     FILE *pFile = fopen(USB_MOUNT_CHECK, "r");
     char *pCurLine = NULL;
     char *pSeek = NULL;
-
-    memset(g_mountName, 0, sizeof(g_mountName));
+    int nRet = 0;
 
     if (pFile)
     {
         while((pCurLine = freadline(pFile)) != NULL)
         {
-            pSeek = strstr(pCurLine, g_devName);
-            if (pSeek)
-            {
-                char *pMount = NULL;
-                pSeek += strlen(g_devName);
-                while(*(pSeek) == ' ')
-                    pSeek++;
+        	UsbPartitionInfo_t *pos = NULL;
+			list_for_each_entry(pos, &g_usbPartitionListHead, partitionList)
+			{
+				pSeek = strstr(pCurLine, pos->partitionName);
+				if (pSeek)
+				{
+					char *pMount = NULL;
+					pSeek += strlen(pos->partitionName);
+					while(*(pSeek) == ' ')
+						pSeek++;
 
-                if (pSeek)
-                {
-                    pMount = pSeek;
-                    while (*pSeek != ' ')
-                    {
-                        pSeek++;
-                    }
+					if (pSeek)
+					{
+						pMount = pSeek;
+						while (*pSeek != ' ')
+						{
+							pSeek++;
+						}
 
-                    memcpy(g_mountName, pMount, (pSeek - pMount));
-                    printf("/dev/%s has been mounted on %s\n", g_devName, g_mountName);
-                    fclose(pFile);
-                    pFile = NULL;
-
-                    return 0;
-                }
-            }
+						memcpy(pos->mountName, pMount, (pSeek - pMount));
+						printf("/dev/%s has been mounted on %s\n", pos->partitionName, pos->mountName);
+						break;
+					}
+				}
+			}
         }
 
         fclose(pFile);
         pFile = NULL;
+        nRet = 0;
     }
     else
     {
         printf("open %s failed\n", USB_MOUNT_CHECK);
+        nRet = -1;
     }
 
-    return -1;
+    return nRet;
 }
 
 static int AutoMountUsbDev()
 {
-    if (CheckUsbDevMountStatus())
+	int mountState = -1;
+	
+	if (!GetUsbDevMountStatus())
     {
-        char dirCmd[64] = {0};
-        char mountCmd[128] = {0};
-        int nRet = 0;
+		UsbPartitionInfo_t *pos = NULL;
+		int mountIdx = 0;
 
-        sprintf(dirCmd, "mkdir -p %s", USB_MOUNT_DEFAULT_DIR);
-        nRet = system(dirCmd);
-        if (nRet)
-        {
-            printf("%s execute failed\n", dirCmd);
-            return -1;
-        }
+		list_for_each_entry(pos, &g_usbPartitionListHead, partitionList)
+		{
+			if (!strlen(pos->mountName))
+			{
+				int nRet = 0;
+				char dirCmd[64] = {0};
+				char mountCmd[128] = {0};
+				char rmCmd[128] = {0};
 
-        sprintf(mountCmd, "mount -t %s /dev/%s %s", USB_FAT32_FORMAT, g_devName, USB_MOUNT_DEFAULT_DIR);
-        nRet = system(mountCmd);
-        if (!nRet)
-        {
-            printf("mount /dev/%s on %s success, usb format is FAT32.\n", g_devName, USB_MOUNT_DEFAULT_DIR);
-            memset(g_mountName, 0, sizeof(g_mountName));
-            memcpy(g_mountName, USB_MOUNT_DEFAULT_DIR, strlen(USB_MOUNT_DEFAULT_DIR));
-            return 0;
-        }
+				sprintf(dirCmd, "mkdir -p %s/udisk%d", USB_MOUNT_DEFAULT_DIR, mountIdx);
+				system(dirCmd);
 
-        memset(mountCmd, 0, sizeof(mountCmd));
-        sprintf(mountCmd, "mount -t %s /dev/%s %s", USB_NTFS_FORMAT, g_devName, USB_MOUNT_DEFAULT_DIR);
-        nRet = system(mountCmd);
-        if (!nRet)
-        {
-            printf("mount /dev/%s on %s success, usb format is NTFS.\n", g_devName, USB_MOUNT_DEFAULT_DIR);
-            memset(g_mountName, 0, sizeof(g_mountName));
-            memcpy(g_mountName, USB_MOUNT_DEFAULT_DIR, strlen(USB_MOUNT_DEFAULT_DIR));
-            return 0;
-        }
+				sprintf(mountCmd, "mount -t %s -o iocharset=utf8 /dev/%s %s/udisk%d", USB_FAT32_FORMAT, pos->partitionName, USB_MOUNT_DEFAULT_DIR, mountIdx);
+				nRet = system(mountCmd);
+				if (!nRet)
+				{
+					sprintf(pos->mountName, "%s/udisk%d", USB_MOUNT_DEFAULT_DIR, mountIdx);
+					printf("mount /dev/%s on %s success, usb format is FAT32.\n", pos->partitionName, pos->mountName);
+					mountState = 0;
+					mountIdx++;
+					continue;
+				}
 
-        printf("mount /dev/%s on %s failed\n", g_devName, USB_MOUNT_DEFAULT_DIR);
-        return -1;
+				memset(mountCmd, 0, sizeof(mountCmd));
+				sprintf(mountCmd, "mount -t %s -o iocharset=utf8 /dev/%s %s/udisk%d", USB_NTFS_FORMAT, pos->partitionName, USB_MOUNT_DEFAULT_DIR, mountIdx);
+				nRet = system(mountCmd);
+				if (!nRet)
+				{
+					sprintf(pos->mountName, "%s/udisk%d", USB_MOUNT_DEFAULT_DIR, mountIdx);
+					printf("mount /dev/%s on %s success, usb format is NTFS.\n", pos->partitionName, pos->mountName);
+					mountState = 0;
+					mountIdx++;
+					continue;
+				}
+
+				printf("mount /dev/%s on %s/udisk%d failed\n", pos->partitionName, USB_MOUNT_DEFAULT_DIR, mountIdx);
+				sprintf(rmCmd, "rm -rf %s/udisk%d", USB_MOUNT_DEFAULT_DIR, mountIdx);
+				system(rmCmd);
+				//return -1;
+			}
+			else
+				mountState = 0;
+		}
     }
+	else
+	{
+		printf("can't get disk partition info\n");
+		mountState = -1;
 
-    return 0;
+	}
+
+	return mountState;
 }
 
 static int AutoUmountUsbDev()
 {
-    if (!CheckUsbDevMountStatus())
-    {
-        char umountCmd[128] = {0};
-        int nRet = 0;
+	if (!list_empty(&g_usbPartitionListHead))
+	{
+		UsbPartitionInfo_t *pos = NULL;
+		UsbPartitionInfo_t *posN = NULL;
+		char umountCmd[128];
+		char rmCmd[128];
+		int nRet = 0;
 
-        sprintf(umountCmd, "umount /dev/%s", g_devName);
-        nRet = system(umountCmd);
-        if (nRet)
-        {
-            printf("umount /dev/%s failed\n", g_devName);
-            return -1;
-        }
-    }
+		list_for_each_entry_safe(pos, posN, &g_usbPartitionListHead, partitionList)
+		{
+			if (strlen(pos->mountName))
+			{
+				printf("mount name is %s\n", pos->mountName);
+				memset(umountCmd, 0, sizeof(umountCmd));
+				sprintf(umountCmd, "umount %s", pos->mountName);
+				nRet = system(umountCmd);
+				if (nRet)
+				{
+					printf("umount /dev/%s from %s failed\n", pos->partitionName, pos->mountName);
+				}
 
-    printf("umount /dev/%s success\n", g_devName);
+				memset(rmCmd, 0, sizeof(rmCmd));
+				sprintf(rmCmd, "rm -rf %s", pos->mountName);
+				system(rmCmd);
+			}
+
+			list_del(&pos->partitionList);
+			free(pos);
+		}
+	}
+
     return 0;
 }
 
@@ -198,7 +271,7 @@ int SSTAR_InitUsbDev(char *pDirName, int nLen)
     if (s32Ret)
         goto exit;
 
-    strncpy(pDirName, g_mountName, nLen);
+    strncpy(pDirName, USB_MOUNT_DEFAULT_DIR, nLen);
 
 exit:
     return s32Ret;
