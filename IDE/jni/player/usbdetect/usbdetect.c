@@ -4,7 +4,7 @@
  *  Created on: 2019年8月26日
  *      Author: koda.xu
  *
- *  该部分为自动mount usb的实现，自动mount usb分区名称为：/tmp/udiskX (X为分区索引，0，1，2...),暂不考虑在下列场景下出现mount分区重名的问题：
+ *  该部分为自动mount usb的实现，自动mount usb分区名称为：/vendor/udiskX (X为分区索引，0，1，2...),暂不考虑在下列场景下出现mount分区重名的问题：
  *  手动mount usb -> 进入播放列表页面 -> 自动mount usb
  */
 
