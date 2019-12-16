@@ -19,7 +19,7 @@
 
 
 #define AI_MAJOR_VERSION 2
-#define AI_SUB_VERSION 10
+#define AI_SUB_VERSION 12
 #define MACRO_TO_STR(macro) #macro
 #define AI_VERSION_STR(major_version,sub_version) ({char *tmp = sub_version/100 ? \
                                     "mi_ai_version_" MACRO_TO_STR(major_version)"." MACRO_TO_STR(sub_version) : sub_version/10 ? \
@@ -102,6 +102,7 @@ MI_S32 MI_AI_SetBfConfigAttr(MI_AUDIO_DEV AiDevId, MI_AI_CHN AiChn, MI_AI_BfConf
 MI_S32 MI_AI_GetBfConfigAttr(MI_AUDIO_DEV AiDevId, MI_AI_CHN AiChn, MI_AI_BfConfigAttr_t* pstBfConfigAttr);
 MI_S32 MI_AI_EnableBf(MI_AUDIO_DEV AiDevId, MI_AI_CHN AiChn);
 MI_S32 MI_AI_DisableBf(MI_AUDIO_DEV AiDevId, MI_AI_CHN AiChn);
+MI_S32 MI_AI_SetBfAngle(MI_AUDIO_DEV AiDevId, MI_AI_CHN AiChn, MI_S32 s32BfAngle);
 
 #ifdef __cplusplus
 }

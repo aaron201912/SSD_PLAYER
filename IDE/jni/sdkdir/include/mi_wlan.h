@@ -1,20 +1,17 @@
-/*
-* mi_wlan.h- Sigmastar
-*
-* Copyright (C) 2018 Sigmastar Technology Corp.
-*
-* Author: XXXX <XXXX@sigmastar.com.cn>
-*
-* This software is licensed under the terms of the GNU General Public
-* License version 2, as published by the Free Software Foundation, and
-* may be copied, distributed, and modified under those terms.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-*
+/* Copyright (c) 2018-2019 Sigmastar Technology Corp.
+ All rights reserved.
+
+  Unless otherwise stipulated in writing, any and all information contained
+ herein regardless in any format shall remain the sole proprietary of
+ Sigmastar Technology Corp. and be kept in strict confidence
+ (��Sigmastar Confidential Information��) by the recipient.
+ Any unauthorized act including without limitation unauthorized disclosure,
+ copying, use, reproduction, sale, distribution, modification, disassembling,
+ reverse engineering and compiling of the contents of Sigmastar Confidential
+ Information is unlawful and strictly prohibited. Sigmastar hereby reserves the
+ rights to any and all damages, losses, costs and expenses resulting therefrom.
 */
+
 #ifndef _MI_WLAN_H_
 #define _MI_WLAN_H_
 #ifdef __cplusplus
@@ -22,6 +19,15 @@ extern "C" {
 #endif
 
 #include "mi_wlan_datatype.h"
+
+#define WLAN_MAJOR_VERSION 1
+#define WLAN_SUB_VERSION 0
+#define MACRO_TO_STR(macro) #macro
+#define WLAN_VERSION_STR(major_version,sub_version) ({char *tmp = sub_version/100 ? \
+                                    "mi_wlan_version_" MACRO_TO_STR(major_version)"." MACRO_TO_STR(sub_version) : sub_version/10 ? \
+                                    "mi_wlan_version_" MACRO_TO_STR(major_version)".0" MACRO_TO_STR(sub_version) : \
+                                    "mi_wlan_version_" MACRO_TO_STR(major_version)".00" MACRO_TO_STR(sub_version);tmp;})
+#define MI_WLAN_API_VERSION WLAN_VERSION_STR(DIVP_MAJOR_VERSION,DIVP_SUB_VERSION)
 
 
 
@@ -40,7 +46,7 @@ extern "C" {
 /// WLAN max MAC len
 #define MI_WLAN_MAX_MAC_LEN 32
 /// WLAN max SSID len
-#define MI_WLAN_MAX_SSID_LEN 36
+#define MI_WLAN_MAX_SSID_LEN 128
 /// WLAN max password len
 #define MI_WLAN_MAX_PASSWD_LEN 40
 /// WLAN max AP number
@@ -315,7 +321,7 @@ typedef struct MI_WLAN_Status_ap_s
 typedef union MI_WLAN_Status_s
 {
     MI_WLAN_Status_sta_t stStaStatus;
-    MI_WLAN_Status_ap_t  stApStatus;
+    MI_WLAN_Status_ap_t stApStatus;
 } MI_WLAN_Status_t;
 
 

@@ -142,8 +142,9 @@ static void video_decoder_abort(player_stat_t *is)
 {
     packet_queue_abort(&is->video_pkt_queue);
     frame_queue_signal(&is->video_frm_queue);
-
+    #if (!ENABLE_SMALL)
     pthread_join(is->videoDecode_tid, NULL);
+    #endif
     pthread_join(is->videoPlay_tid, NULL);
 
     packet_queue_flush(&is->video_pkt_queue);
@@ -388,5 +389,5 @@ void stream_seek(player_stat_t *is, int64_t pos, int64_t rel, int seek_by_bytes)
         pthread_cond_signal(&is->continue_read_thread);
     }
 }
-
 #endif
+

@@ -1,20 +1,17 @@
-/*
-* mi_wlan_datatype.h- Sigmastar
-*
-* Copyright (C) 2018 Sigmastar Technology Corp.
-*
-* Author: XXXX <XXXX@sigmastar.com.cn>
-*
-* This software is licensed under the terms of the GNU General Public
-* License version 2, as published by the Free Software Foundation, and
-* may be copied, distributed, and modified under those terms.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-*
+/* Copyright (c) 2018-2019 Sigmastar Technology Corp.
+ All rights reserved.
+
+  Unless otherwise stipulated in writing, any and all information contained
+ herein regardless in any format shall remain the sole proprietary of
+ Sigmastar Technology Corp. and be kept in strict confidence
+ (��Sigmastar Confidential Information��) by the recipient.
+ Any unauthorized act including without limitation unauthorized disclosure,
+ copying, use, reproduction, sale, distribution, modification, disassembling,
+ reverse engineering and compiling of the contents of Sigmastar Confidential
+ Information is unlawful and strictly prohibited. Sigmastar hereby reserves the
+ rights to any and all damages, losses, costs and expenses resulting therefrom.
 */
+
 #ifndef __MI_WLAN_DATATYPE_H__
 #define __MI_WLAN_DATATYPE_H__
 #ifdef __cplusplus

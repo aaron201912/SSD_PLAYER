@@ -102,8 +102,8 @@ static int audio_decode_frame(AVCodecContext *p_codec_ctx, packet_queue_t *p_pkt
         if (pkt.data == a_flush_pkt.data)
         {
             // 复位解码器内部状态/刷新内部缓冲区。当seek操作或切换流时应调用此函数。
-            printf("packet_queue_get null\n");
             avcodec_flush_buffers(p_codec_ctx);
+            printf("avcodec_flush_buffers for audio!\n");
         }
         else
         {
@@ -447,7 +447,8 @@ static void* audio_playing_thread(void *arg)
         }
 
         // is->audio_write_buf_size是本帧中尚未拷入SDL音频缓冲区的数据量
-        is->audio_write_buf_size = is->audio_frm_size - is->audio_cp_index;
+        //is->audio_write_buf_size = is->audio_frm_size - is->audio_cp_index;
+        is->audio_write_buf_size = 0;
         /* Let's assume the audio driver that is used by SDL has two periods. */
         // 3. 更新时钟
         if (!isnan(is->audio_clock))

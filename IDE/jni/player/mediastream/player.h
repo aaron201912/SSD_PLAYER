@@ -25,9 +25,10 @@ extern "C" {               // 告诉编译器下列代码要以C链接约定的�
 #include "mi_sys.h"
 #include "mi_sys_datatype.h"
 
-
-#define     SUCCESS     0
-#define     FAIL        1
+#define     SUPPORT_B_FRAME 1
+#define     ENABLE_SMALL    0
+#define     SUCCESS         0
+#define     FAIL            1
 
 #define CheckFuncResult(result)\
     if (result != SUCCESS)\
@@ -47,12 +48,12 @@ extern "C" {               // 告诉编译器下列代码要以C链接约定的�
 #define AV_NOSYNC_THRESHOLD 10.0
 
 /* polls for possible required screen refresh at least this often, should be less than 1/fps */
-#define REFRESH_RATE 0.005
+#define REFRESH_RATE 0.01
 
 #define SDL_AUDIO_BUFFER_SIZE 1024
 #define MAX_AUDIO_FRAME_SIZE 192000
 
-#define MAX_QUEUE_SIZE (15 * 1024 * 1024)
+#define MAX_QUEUE_SIZE (5 * 1024 * 1024)
 #define MIN_FRAMES 25
 
 /* Minimum SDL audio buffer size, in samples. */
@@ -138,8 +139,8 @@ typedef struct {
     MI_S32 (*fpGetMediaInfo)();
     MI_S32 (*fpGetDuration)(long long duration);
     MI_S32 (*fpGetCurrentPlayPos)(long long currentPos, long long frame_duration);
-	MI_S32 (*fpGetCurrentPlayPosFromVideo)(long long currentPos, long long frame_duration);
-	MI_S32 (*fpGetCurrentPlayPosFromAudio)(long long currentPos, long long frame_duration);
+    MI_S32 (*fpGetCurrentPlayPosFromVideo)(long long currentPos, long long frame_duration);
+    MI_S32 (*fpGetCurrentPlayPosFromAudio)(long long currentPos, long long frame_duration);
     MI_S32 (*fpDisplayVideo)(MI_S32 s32Width, MI_S32 s32Height, void *pYData, void *pUVData);
     MI_S32 (*fpPlayAudio)(MI_U8 *pu8AudioData, MI_U32 u32DataLen);
     MI_S32 (*fpPauseAudio)();

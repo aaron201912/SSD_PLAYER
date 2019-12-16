@@ -58,6 +58,7 @@ typedef MI_S32 MI_IVE_HANDLE;
 typedef MI_S32 MI_VPE_DEV;
 typedef MI_S32 MI_DIVP_CHN;
 typedef MI_U32 MI_RGN_HANDLE;
+typedef MI_U32 MI_SED_CHN;
 typedef MI_S32  MI_HANDLE;
 //-------------------------------------------------------------------------------------------------
 //  Macros
@@ -191,6 +192,9 @@ typedef enum
     E_MI_MODULE_ID_CIPHER = 26,
     E_MI_MODULE_ID_SNR = 27,
     E_MI_MODULE_ID_WLAN =28,
+    E_MI_MODULE_ID_IPU = 29,
+    E_MI_MODULE_ID_MIPITX = 30,
+    //E_MI_MODULE_ID_SED  = 29,
     E_MI_MODULE_ID_MAX,
 } MI_ModuleId_e;
 

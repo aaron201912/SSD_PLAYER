@@ -70,6 +70,7 @@ typedef enum
     E_MI_AUDIO_MODE_I2S_MASTER,                /* I2S master mode */
     E_MI_AUDIO_MODE_I2S_SLAVE,                 /* I2S slave mode */
     E_MI_AUDIO_MODE_TDM_MASTER,                /* TDM master mode */
+    E_MI_AUDIO_MODE_TDM_SLAVE,                 /* TDM slave mode */
     E_MI_AUDIO_MODE_MAX,
 }MI_AUDIO_Mode_e;
 
@@ -107,6 +108,8 @@ typedef enum{
     E_MI_AUDIO_I2S_MCLK_16_384M,                        //16.384M
     E_MI_AUDIO_I2S_MCLK_18_432M,                        //18.432M
     E_MI_AUDIO_I2S_MCLK_24_576M,                        //24.576M
+    E_MI_AUDIO_I2S_MCLK_24M,                            // 24MHz
+    E_MI_AUDIO_I2S_MCLK_48M,                            // 48MHz
 }MI_AUDIO_I2sMclk_e;
 
 typedef struct MI_AUDIO_I2sConfig_s
