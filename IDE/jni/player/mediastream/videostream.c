@@ -209,7 +209,7 @@ exit:
 // 返回值delay是将输入参数delay经校正后得到的值
 static double compute_target_delay(double delay, player_stat_t *is)
 {
-    double sync_threshold, diff = 0, delay_tim;
+    double sync_threshold, diff = 0, delay_tim = delay;
 
     /* update delay to follow master synchronisation source */
 
@@ -244,11 +244,6 @@ static double compute_target_delay(double delay, player_stat_t *is)
         else if (diff >= sync_threshold)    // 视频时钟超前于同步时钟，且超过同步域值
             delay_tim = 2 * delay;              // 视频播放要放慢脚步，delay扩大至2倍
     }
-    else
-    {
-        delay_tim = REFRESH_RATE;
-    }
-    //av_log(NULL, AV_LOG_TRACE, "video: delay=%0.3f A-V=%f\n", delay, -diff);
     //printf("video: delay=%0.3f A-V=%f\n", delay_tim, -diff);
 
     return delay_tim;
@@ -402,6 +397,7 @@ retry:
         if (time > is->frame_timer + duration)
         {
             frame_queue_next(&is->video_frm_queue);   // 删除上一帧已显示帧，即删除lastvp，读指针加1(从lastvp更新到vp)
+            //printf("discarded current frame!\n");
             goto retry;
         }
     }
@@ -425,7 +421,7 @@ static int video_refresh_async(void *opaque, double *remaining_time, AVPacket *p
     double delay, time, pts;
     uint8_t *frame_ydata, *frame_uvdata;
     int ret;
-    static int64_t time_current, time_last;
+    static int counter;
 
     // 暂停处理
     if (is->paused)
@@ -499,7 +495,6 @@ static int video_refresh_async(void *opaque, double *remaining_time, AVPacket *p
         }
         av_packet_unref(packet);
 
-        time_current = av_gettime_relative();
         ret = avcodec_receive_frame(is->p_vcodec_ctx, frame);
         if (ret < 0)
         {
@@ -511,7 +506,9 @@ static int video_refresh_async(void *opaque, double *remaining_time, AVPacket *p
             else
             {
                 //av_log(NULL, AV_LOG_ERROR, "ravcodec_receive_frame failed!\n");
-                if (time_last > 0 && time_current - time_last > 3000000)
+                *remaining_time = REFRESH_RATE;
+                counter ++;
+                if (counter > 300)
                 {
                     av_log(NULL, AV_LOG_ERROR, "can't get a frame from vdec for long time!\n");
                     is->play_error = -4;
@@ -520,8 +517,7 @@ static int video_refresh_async(void *opaque, double *remaining_time, AVPacket *p
         }
         else
         {
-            // 重置计时器
-            time_last = time_current;
+            counter = 0;
             // 此时的pts为当前显示图像的pts
             frame->pts = frame->best_effort_timestamp;
             pts = (frame->pts == AV_NOPTS_VALUE) ? NAN : frame->pts * av_q2d(tb);

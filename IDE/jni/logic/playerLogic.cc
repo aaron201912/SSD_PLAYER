@@ -316,7 +316,7 @@ MI_S32 CreatePlayerDev()
     // 5.配置VDEC解码类型B/not B
     MI_VDEC_InitParam_t stVdecInitParam;
     // MI_VDEC_InitDev在SYS_Exit退出之前只能执行一次
-    printf("g_vdec_conf value : %d\n", g_vdec_conf);
+    //printf("g_vdec_conf value : %d\n", g_vdec_conf);
     if (false == g_vdec_conf)
     {
         memset(&stVdecInitParam, 0, sizeof(MI_VDEC_InitParam_t));
@@ -486,6 +486,7 @@ MI_S32 GetCurrentPlayPos(long long currentPos, long long frame_duration)
     char curTime[32];
     long long curSec = 0;
     int trackPos = 0;
+    int lastPos, offsetPos;
 
     if (currentPos > g_duration)
     {
@@ -495,12 +496,11 @@ MI_S32 GetCurrentPlayPos(long long currentPos, long long frame_duration)
 
     // update playtime static
     if (g_firstPlayPos < 0)
-    	curSec = 0;
+        curSec = 0;
     else
     {
         long long pos = currentPos % PROGRESS_UPDATE_TIME_INTERVAL;
         //printf("pos:%lld, frame_duration:%lld, curPos:%lld, firstPos:%lld\n", pos, frame_duration, currentPos, g_firstPlayPos);
-
         if (pos > frame_duration/2 && pos <= (PROGRESS_UPDATE_TIME_INTERVAL - frame_duration/2))
             return 0;
     }
@@ -512,7 +512,12 @@ MI_S32 GetCurrentPlayPos(long long currentPos, long long frame_duration)
     mTextview_curtimePtr->setText(curTime);
 
     // update progress bar
-    trackPos = (currentPos * mSeekbar_progressPtr->getMax()) / g_duration;
+    lastPos   = mSeekbar_progressPtr->getProgress();
+    offsetPos = AV_TIME_BASE * mSeekbar_progressPtr->getMax() / g_duration + 1;
+    trackPos  = (currentPos * mSeekbar_progressPtr->getMax()) / g_duration;
+    if ((lastPos - trackPos > offsetPos) || (trackPos - lastPos > offsetPos))
+        return 0;
+
     mSeekbar_progressPtr->setProgress(trackPos);
 
     if (g_firstPlayPos < 0)

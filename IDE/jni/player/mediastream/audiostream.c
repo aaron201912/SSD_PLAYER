@@ -448,7 +448,7 @@ static void* audio_playing_thread(void *arg)
 
         // is->audio_write_buf_size是本帧中尚未拷入SDL音频缓冲区的数据量
         //is->audio_write_buf_size = is->audio_frm_size - is->audio_cp_index;
-        is->audio_write_buf_size = 0;
+        is->audio_hw_buf_size = MI_AUDIO_SAMPLE_PER_FRAME * MI_AUDIO_MAX_FRAME_NUM * 8;
         /* Let's assume the audio driver that is used by SDL has two periods. */
         // 3. 更新时钟
         if (!isnan(is->audio_clock))
