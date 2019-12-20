@@ -16,10 +16,11 @@
 
 #include "mi_common_datatype.h"
 #include "mi_sys_datatype.h"
+#include "cam_os_wrapper.h"
 
 #define MI_VENC_MAX_CHN_NUM_PER_MODULE (8)
 #define MI_VENC_MAX_CHN_NUM_PER_DC (3)
-
+#define VENC_CUST_MAP_NUM    (2)
 
 //max supported channel number. But the number would be limited by each module.
 #define VENC_MAX_CHN_NUM    (16) //from SPEC
@@ -201,6 +202,13 @@ typedef enum
     E_MI_VENC_RC_PRIORITY_MAX,
 } MI_VENC_RcPriority_e;
 
+typedef enum
+{
+    E_MI_VENC_INPUT_MODE_NORMAL_FRMBASE = 0, /*Handshake with input by about 3 buffers in frame mode*/
+    E_MI_VENC_INPUT_MODE_RING_ONE_FRM, /*Handshake with input by one buffer in ring mode*/
+    E_MI_VENC_INPUT_MODE_RING_HALF_FRM, /*Handshake with input by half buffer in ring mode*/
+    E_MI_VENC_INPUT_MODE_MAX
+} MI_VENC_InputSrcBufferMode_e;
 
 //==== Structures ====
 
@@ -810,4 +818,75 @@ typedef struct MI_VENC_ModParam_s
         MI_VENC_ParamModJpege_t stJpegeModParam;
     };
 } MI_VENC_ModParam_t;
+
+typedef struct MI_VENC_InputSourceConfig_s
+{
+    MI_VENC_InputSrcBufferMode_e eInputSrcBufferMode;
+}MI_VENC_InputSourceConfig_t;
+
+typedef struct MI_VENC_RuntimeRes_s
+{
+    MI_U32 u32Width;
+    MI_U32 u32Height;
+    MI_U32 u32Size;
+}MI_VENC_RuntimeRes_t;
+
+typedef struct MI_VENC_ApplyMap_s
+{
+    MI_PHY phyAddr;
+    MI_U32 u32MapIdx;
+    MI_U32 u32RunTimeCustMapSize;
+}MI_VENC_ApplyMap_t;
+
+typedef struct MI_VENC_CustomMap_s
+{
+    MI_BOOL bEnabelHistoStaticInfo;
+    MI_U32 u32RunTimeWidth;
+    MI_U32 u32RunTimeHeight;
+    MI_U32 u32RunTimeCustMapSize;
+    MI_U32 u32MaxPicWidth;
+    MI_U32 u32MaxPicHeight;
+    MI_U32 u32MaxCustMapSize;
+    MI_PHY phyAddr[VENC_CUST_MAP_NUM];
+    void  *virAddr[VENC_CUST_MAP_NUM];
+    MI_BOOL  bAvailable[VENC_CUST_MAP_NUM];
+    MI_VENC_ModType_e eType;
+    CamOsMutex_t stMutex;
+} MI_VENC_CustomMap_t;
+
+typedef struct MI_VENC_FrameHistoStaticInfo_s
+{
+    MI_U8   u8PicSkip;
+    MI_U16  u16PicType;
+    MI_U32  u32PicPoc;
+    MI_U32  u32PicSliNum;
+    MI_U32  u32PicNumIntra;
+    MI_U32  u32PicNumMerge;
+    MI_U32  u32PicNumSkip;
+    MI_U32  u32PicAvgCtuQp;
+    MI_U32  u32PicByte;
+    MI_U32  u32GopPicIdx;
+    MI_U32  u32PicNum;
+    MI_U32  u32PicDistLow;
+    MI_U32  u32PicDistHigh;
+    CamOsMutex_t stMutex;
+} MI_VENC_FrameHistoStaticInfo_t;
+
+typedef struct MI_VENC_CustMapInfo_s
+{
+    MI_PHY phyAddr[VENC_CUST_MAP_NUM];
+    MI_U32 u32MaxWidth;
+    MI_U32 u32MaxHeight;
+    MI_U32 u32MaxSize;
+    MI_VENC_ModType_e eType;
+} MI_VENC_CustMapInfo_t;
+
+typedef struct MI_VENC_AdvCustRcAttr_s
+{
+    MI_BOOL bEnableQPMap;
+    MI_BOOL bAbsQP;
+    MI_BOOL bEnableModeMap;
+    MI_BOOL bEnabelHistoStaticInfo;
+} MI_VENC_AdvCustRcAttr_t;
+
 #endif /* End of #ifndef __MI_VENC_DATATYPE_ */

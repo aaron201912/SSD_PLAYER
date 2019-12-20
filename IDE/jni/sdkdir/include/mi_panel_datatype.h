@@ -89,9 +89,10 @@ typedef enum
 
 typedef enum
 {
-    E_MI_PNL_OUTPUT_10BIT_MODE = 0, //default is 10bit, becasue 8bit panel can use 10bit config and 8bit config.
-    E_MI_PNL_OUTPUT_6BIT_MODE  = 1, //but 10bit panel(like PDP panel) can only use 10bit config.
-    E_MI_PNL_OUTPUT_8BIT_MODE  = 2, //and some PDA panel is 6bit.
+    E_MI_PNL_OUTPUT_10BIT_MODE   = 0, //default is 10bit, becasue 8bit panel can use 10bit config and 8bit config.
+    E_MI_PNL_OUTPUT_6BIT_MODE    = 1, //but 10bit panel(like PDP panel) can only use 10bit config.
+    E_MI_PNL_OUTPUT_8BIT_MODE    = 2, //and some PDA panel is 6bit.
+    E_MI_PNL_OUTPUT_565BIT_MODE  = 3,
 }MI_PANEL_OutputFormatBitMode_e;
 
 typedef enum
@@ -110,6 +111,11 @@ typedef enum
     E_MI_PNL_CH_SWAP_4,
 }MI_PANEL_ChannelSwapType_e;
 
+typedef enum
+{
+    E_MI_PNL_MIPI_DSI_PACKET_TYPE_DCS = 0,
+    E_MI_PNL_MIPI_DSI_PACKET_TYPE_GENERIC = 1,
+}MI_PANEL_MipiDsiPacketType_e;
 /*-------------------------------------------------------------------------------------------------
  * Structures
  ------------------------------------------------------------------------------------------------*/
@@ -182,6 +188,8 @@ typedef struct
     MI_U8  u8PolCh2;  // channel 2 polarity, 0:HW default, 1:positive, 2:negative
     MI_U8  u8PolCh3;  // channel 3 polarity, 0:HW default, 1:positive, 2:negative
     MI_U8  u8PolCh4;  // channel 4 polarity, 0:HW default, 1:positive, 2:negative
+
+    MI_PANEL_MipiDsiPacketType_e ePacketType;
 }MI_PANEL_MipiDsiConfig_t;
 
 typedef struct

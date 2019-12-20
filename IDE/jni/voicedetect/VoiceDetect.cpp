@@ -23,6 +23,11 @@
 #include "appconfig.h"
 
 
+/*
+ * 音频识别库处理单声道的数据，多声道数据无法识别
+ * 启用Bf功能必须设置多声道，Bf处理后输出单声道数据
+ */
+
 #define AD_LOG(fmt, args...) {printf("\033[1;34m");printf("%s[%d]:", __FUNCTION__, __LINE__);printf(fmt, ##args);printf("\033[0m");}
 
 typedef struct
@@ -472,6 +477,12 @@ static MI_S32 SSTAR_AudioInStart()
     MI_SYS_ChnPort_t stAiChn0OutputPort0;
     MI_AI_VqeConfig_t stAiVqeConfig;
 
+#ifdef ENABLE_BF
+    MI_AI_BfInitAttr_t stBfInit;
+    MI_AI_BfConfigAttr_t stBfConfig;
+    MI_S32 s32AiBfDoa = 0;
+#endif
+
     //Ao
     MI_AUDIO_DEV AoDevId = AO_DEV_ID;
     MI_AO_CHN AoChn = 0;
@@ -483,11 +494,17 @@ static MI_S32 SSTAR_AudioInStart()
     memset(&stAiSetAttr, 0, sizeof(MI_AUDIO_Attr_t));
     stAiSetAttr.eBitwidth = E_MI_AUDIO_BIT_WIDTH_16;
     stAiSetAttr.eSamplerate = AUDIO_SAMPLE_RATE;
-    stAiSetAttr.eSoundmode = E_MI_AUDIO_SOUND_MODE_MONO;
     stAiSetAttr.eWorkmode = E_MI_AUDIO_MODE_I2S_MASTER;
     //stAiSetAttr.eWorkmode = E_MI_AUDIO_MODE_I2S_SLAVE;
+#ifdef ENABLE_BF
+    stAiSetAttr.eSoundmode = E_MI_AUDIO_SOUND_MODE_STEREO;
+    stAiSetAttr.u32ChnCnt = 1;
+#else
+    stAiSetAttr.eSoundmode = E_MI_AUDIO_SOUND_MODE_MONO;
     stAiSetAttr.u32ChnCnt = 2;
     //stAiSetAttr.u32ChnCnt = 4;
+#endif
+
     stAiSetAttr.u32FrmNum = 16;
     stAiSetAttr.u32PtNumPerFrm = AUDIO_PT_NUMBER_FRAME;
 
@@ -558,6 +575,25 @@ static MI_S32 SSTAR_AudioInStart()
     ExecFunc(MI_AI_Enable(AiDevId), MI_SUCCESS);
     ExecFunc(MI_AI_EnableChn(AiDevId, AiChn), MI_SUCCESS);
 
+    // bf
+#ifdef ENABLE_BF
+    memset(&stBfInit, 0, sizeof(MI_AI_BfInitAttr_t));
+    stBfInit.u32ChanCnt = 2;
+    stBfInit.u32MicDistance = 3;
+
+    memset(&stBfConfig, 0, sizeof(MI_AI_BfConfigAttr_t));
+    stBfConfig.s32Temperature = 25;
+    stBfConfig.s32NoiseSupressionMode = 8;
+    stBfConfig.s32NoiseGateDbfs = -40;
+    stBfConfig.s32NoiseEstimation = 1;
+    stBfConfig.outputGain = 0.7;
+
+    ExecFunc(MI_AI_SetBfInitAttr(AiDevId, AiChn, &stBfInit), MI_SUCCESS);
+    ExecFunc(MI_AI_SetBfConfigAttr(AiDevId, AiChn, &stBfConfig), MI_SUCCESS);
+    ExecFunc(MI_AI_SetBfAngle(AiDevId, AiChn, s32AiBfDoa), MI_SUCCESS);
+    ExecFunc(MI_AI_EnableBf(AiDevId, AiChn), MI_SUCCESS);
+#endif
+
 #if 1
 #if USE_AMIC
     ExecFunc(MI_AI_SetVqeVolume(AiDevId, 0, 9), MI_SUCCESS);
@@ -600,6 +636,9 @@ static MI_S32 SSTAR_AudioInStop()
     pstAudioInMng->bRunFlag = FALSE;
     pthread_join(pstAudioInMng->pt, NULL);
 
+#ifdef ENABLE_BF
+    ExecFunc(MI_AI_DisableBf(AiDevId, AiChn), MI_SUCCESS);
+#endif
     ExecFunc(MI_AI_DisableVqe(AiDevId, AiChn), MI_SUCCESS);
     ExecFunc(MI_AI_DisableChn(AiDevId, AiChn), MI_SUCCESS);
     ExecFunc(MI_AI_Disable(AiDevId), MI_SUCCESS);

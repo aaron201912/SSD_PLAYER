@@ -17,7 +17,7 @@
 #include "mi_venc_datatype.h"
 
 #define VENC_MAJOR_VERSION 2
-#define VENC_SUB_VERSION 7
+#define VENC_SUB_VERSION 9
 #define MACRO_TO_STR(macro) #macro
 #define VENC_VERSION_STR(major_version,sub_version) ({char *tmp = sub_version/100 ? \
                                     "mi_venc_version_" MACRO_TO_STR(major_version)"." MACRO_TO_STR(sub_version) : sub_version/10 ? \
@@ -98,6 +98,13 @@ MI_S32 MI_VENC_GetSuperFrameCfg(MI_VENC_CHN VeChn, MI_VENC_SuperFrameCfg_t *pstS
 MI_S32 MI_VENC_SetRcPriority(MI_VENC_CHN VeChn, MI_VENC_RcPriority_e *peRcPriority);
 MI_S32 MI_VENC_GetRcPriority(MI_VENC_CHN VeChn, MI_VENC_RcPriority_e *peRcPriority);
 MI_S32 MI_VENC_DupChn(MI_VENC_CHN VeChn);
+MI_S32 MI_VENC_SetInputSourceConfig(MI_VENC_CHN VeChn, MI_VENC_InputSourceConfig_t *pstInputSourceConfig);
+MI_S32 MI_VENC_GetRuntimeRes(MI_VENC_CHN VeChn, MI_VENC_RuntimeRes_t *pstRuntimeRes);
+MI_S32 MI_VENC_AllocCustomMap (MI_VENC_CHN VeChn, MI_PHY *pPhyAddr, void **ppCpuAddr, MI_U32 *pu32Width, MI_U32 *pu32Height);
+MI_S32 MI_VENC_ApplyCustomMap (MI_VENC_CHN VeChn, MI_PHY PhyAddr);
+MI_S32 MI_VENC_GetLastHistoStaticInfo (MI_VENC_CHN VeChn, MI_VENC_FrameHistoStaticInfo_t** ppFrmHistoStaticInfo);
+MI_S32 MI_VENC_ReleaseHistoStaticInfo(MI_VENC_CHN VeChn);
+MI_S32 MI_VENC_SetAdvCustRcAttr(MI_VENC_CHN VeChn, MI_VENC_AdvCustRcAttr_t *pstAdvCustRcAttr);
 
 #ifdef __cplusplus
 }
