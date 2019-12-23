@@ -732,8 +732,8 @@ static int open_video_stream(player_stat_t *is)
     // 硬解时选择VDEC缩小画面,传入宽高,由于VDEC只能缩小这里对宽高进行判断
     p_codec_ctx->flags  = ALIGN_BACK(is->out_width , 32);
     p_codec_ctx->flags2 = ALIGN_BACK(is->out_height, 32);
-    p_codec_ctx->flags  = (p_codec_ctx->flags  > p_codec_par->width ) ? p_codec_par->width  : p_codec_ctx->flags;
-    p_codec_ctx->flags2 = (p_codec_ctx->flags2 > p_codec_par->height) ? p_codec_par->height : p_codec_ctx->flags2;
+    p_codec_ctx->flags  = (p_codec_ctx->flags  > p_codec_par->width ) ? ALIGN_BACK(p_codec_par->width , 32) : p_codec_ctx->flags;
+    p_codec_ctx->flags2 = (p_codec_ctx->flags2 > p_codec_par->height) ? ALIGN_BACK(p_codec_par->height, 32) : p_codec_ctx->flags2;
     // 1.3.2 p_codec_ctx初始化：p_codec_par ==> p_codec_ctx，初始化相应成员
     ret = avcodec_parameters_to_context(p_codec_ctx, p_codec_par);
     if (ret < 0)
