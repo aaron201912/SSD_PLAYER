@@ -16,7 +16,7 @@ LDFLAGS = -L$(MINIGUI_PATH)/lib -L$(PROJECT_PATH)/lib
 CONFIG_PREFIX =.
 
 LOCAL_CFLAGS =
-LOCAL_LDFLAGS = -leasyui -lminigui_zk -lmgplus_zk -lpng12 -ljpeg -lpthread -lfreetype -ldl -lts -lz -lmi_common -lmi_gfx -lmi_sys -lmi_disp -lmi_panel -lmi_vdec -lmi_ao -lmi_ai -lCSpotter -Wl,--hash-style=gnu
+LOCAL_LDFLAGS = -leasyui -lminigui_zk -lmgplus_zk -lpng12 -ljpeg -lpthread -lfreetype -ldl -lts -lz -lmi_common -lmi_gfx -lmi_sys -lmi_disp -lmi_panel -lmi_vdec -lmi_ao -lmi_ai -lDSpotter -Wl,--hash-style=gnu
 
 CPPSRCS += ${wildcard *.cpp}
 CPPOBJS = $(patsubst %.cpp, %.cpp.o, $(CPPSRCS))
