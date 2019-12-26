@@ -601,11 +601,8 @@ int v4l2_read_header(DeviceContex_t *ctx)
         v4l2_log_file = fopen("/dev/null", "w");
 
     s->fd = device_open(ctx, ctx->url);
-    printf("device_open: url=%s\n", ctx->url);
     if (s->fd < 0)
         return s->fd;
-
-    printf("device open ,fd=%d\n", s->fd);
 
     if (s->channel != -1) {
         /* set video input */

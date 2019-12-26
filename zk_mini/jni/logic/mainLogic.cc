@@ -193,6 +193,7 @@ const char* IconTab[]={
 		"waveViewActivity",
 		"testpointerActivity",
 		"windowActivity",
+		"video2Activity",
 		"tesListActivity",
 		"adActivity",
 		"qrcodeActivity",

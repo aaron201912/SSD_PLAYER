@@ -35,46 +35,39 @@
 #include "manager/LanguageManager.h"
 #include "os/SystemProperties.h"
 #include "os/UpgradeMonitor.h"
-
-#include "broadcastserver.h"
-
-Uploader* mSocket=NULL;
-bool bHavePic = false;
-BroadcastServer broadcast;
-
+#include "base_types.h"
 
 extern "C"{
+#include "voicedetect.h"
 
-typedef struct {
-    char szWord[64];
-    int index;
-} WordInfo_t;
+typedef enum {
+	START_PLAY_MUSIC = 5,
+	STOP_PLAY_MUSIC = 8,
+	ALL_APP_CMD
+} AppCmd_e;
 
-typedef void* (*VoiceAnalyzeCallback)(char*, int);
-
-int SSTAR_VoiceDetectInit();
-int SSTAR_VoiceDetectDeinit();
-int SSTAR_VoiceDetectGetWordList(WordInfo_t *pWordList, int cnt);
-int SSTAR_VoiceDetectStart(VoiceAnalyzeCallback pfnCallback);
-void SSTAR_VoiceDetectStop();
-
+int SSTAR_StartPlayAudioFile(const char *WavAudioFile, int aoVolume);
+int SSTAR_StopPlayAudioFile(void);
+void SSTAR_setVolume(int vol);
 }
 
-#define WORD_COUNT			32
+#define WORD_COUNT			50
 
-static WordInfo_t sWordInfoList[WORD_COUNT];
 static bool sIsSeled[WORD_COUNT];
+static HANDLE g_hDSpotter = NULL;
+static TrainedWord_t g_stWordList[WORD_COUNT];
+static int g_nWordCnt = 0;
 
-static void* onVoiceAnalyzeCallback(char *msg, int ext) {
-	LOGD("msg: %s, ext %d\n", msg, ext);
-	for (int i = 0; i < WORD_COUNT; ++i) {
-		if (!memcmp(msg, sWordInfoList[i].szWord, strlen(sWordInfoList[i].szWord)))
-		{
+static void* onVoiceAnalyzeCallback(int commandID) {
+	//LOGD("Get cmd id: %d\n", commandID);
+
+	if (commandID >= 0 && commandID < WORD_COUNT)
+	{
+		for (int i=0; i < WORD_COUNT; i++)
 			memset(sIsSeled, 0, sizeof(sIsSeled));
-			sIsSeled[i] = true;
-			mWordListviewPtr->refreshListView();
-			break;
-		}
+
+		sIsSeled[commandID] = true;
+		mWordListviewPtr->refreshListView();
 	}
 
 	return NULL;
@@ -131,22 +124,22 @@ public:
 static iWiFiSocketListener mWifiSocket;
 static void onUI_init(){
     //Tips :添加 UI初始化的显示代码到这里,如:mText1->setText("123");
-    EASYUICONTEXT->hideStatusBar();
-
-    memset(sWordInfoList, 0, sizeof(sWordInfoList));
     memset(sIsSeled, 0, sizeof(sIsSeled));
+    g_nWordCnt = SSTAR_VoiceDetectGetWordList(g_stWordList, WORD_COUNT);
+	g_hDSpotter = SSTAR_VoiceDetectInit();
+	if (!g_hDSpotter)
+	{
+		printf("Voice detect init failed\n");
+		return;
+	}
 
-    SSTAR_VoiceDetectInit();
-    int ret = SSTAR_VoiceDetectGetWordList(sWordInfoList, WORD_COUNT);
-    LOGD("ret: %d\n", ret);
-
-    SSTAR_VoiceDetectStart(onVoiceAnalyzeCallback);
+	SSTAR_VoiceDetectStart(g_hDSpotter, onVoiceAnalyzeCallback);
 }
 
 static void onUI_quit() {
-//    EASYUICONTEXT->showStatusBar();
+	printf("onUi quit\n");
 	SSTAR_VoiceDetectStop();
-	SSTAR_VoiceDetectDeinit();
+	SSTAR_VoiceDetectDeinit(g_hDSpotter);
 }
 
 
@@ -193,7 +186,15 @@ static int getListItemCount_WordListview(const ZKListView *pListView) {
 
 static void obtainListItemData_WordListview(ZKListView *pListView, ZKListView::ZKListItem *pListItem, int index) {
     //LOGD(" obtainListItemData_ WordListview  !!!\n");
-	pListItem->setText(sWordInfoList[index].szWord);
+	if (index < g_nWordCnt)
+	{
+		pListItem->setText(g_stWordList[index].cmd);
+	}
+	else
+	{
+		pListItem->setText(g_stWordList[index].cmd);
+	}
+
 	pListItem->setSelected(sIsSeled[index]);
 }
 

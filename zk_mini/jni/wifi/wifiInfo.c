@@ -119,8 +119,12 @@ int checkProfile()
 	pCfgFile = fopen(WPA_CFG, "r+");
 	if (pCfgFile)
 	{
+		fseek(pCfgFile, 0, SEEK_END);
+		int fileLen = ftell(pCfgFile);
+		printf("cfg file len is %d\n", fileLen);
 		fseek(pCfgFile, 0, SEEK_SET);
-		if (ftell(pCfgFile))
+
+		if (fileLen)
 		{
 			printf("%s is not empty\n", WPA_CFG);
 			fclose(pCfgFile);
@@ -136,6 +140,8 @@ int checkProfile()
 		return -1;
 
 	fclose(pBackupFile);
+
+	printf("wpa config file is empty, recover config file\n");
 	memset(cmd, 0, sizeof(cmd));
 	sprintf(cmd, "cp %s %s", WPA_CFG_BACKUP, WPA_CFG);
 	system(cmd);
