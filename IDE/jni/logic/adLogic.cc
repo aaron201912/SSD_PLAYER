@@ -189,10 +189,12 @@ static void obtainListItemData_WordListview(ZKListView *pListView, ZKListView::Z
 	if (index < g_nWordCnt)
 	{
 		pListItem->setText(g_stWordList[index].cmd);
+		pListItem->setSelected(sIsSeled[index]);
 	}
 	else
 	{
-		pListItem->setText(g_stWordList[index].cmd);
+		pListItem->setText("");
+		pListItem->setSelected(false);
 	}
 
 	pListItem->setSelected(sIsSeled[index]);
