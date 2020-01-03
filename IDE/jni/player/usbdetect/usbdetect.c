@@ -17,7 +17,6 @@
 #include "usbdetect.h"
 #include "list.h"
 
-
 #define USB_PARTTITION_CHECK                "/proc/partitions"
 #define USB_MOUNT_CHECK                     "/proc/mounts"
 #define USB_FAT32_FORMAT                    "vfat"
@@ -83,20 +82,40 @@ static int DetectUsbDev(void)
 
     if (pFile)
     {
+    	char diskName[4] = {0};
         while((pCurLine = freadline(pFile)) != NULL)
         {
             pSeek = strstr(pCurLine, "sd");
             if (pSeek)
             {
-                if ((pSeek[2] >= 'a' && pSeek[2] <= 'z') && (pSeek[3] >= '1' && pSeek[3] <= '9'))
-                {
-                	UsbPartitionInfo_t *pUsbPartitionInfo = (UsbPartitionInfo_t*)malloc(sizeof(UsbPartitionInfo_t));
-					memset(pUsbPartitionInfo, 0, sizeof(UsbPartitionInfo_t));
-					INIT_LIST_HEAD(&pUsbPartitionInfo->partitionList);
-					memcpy(pUsbPartitionInfo->partitionName, pSeek, 4);
-					list_add_tail(&pUsbPartitionInfo->partitionList, &g_usbPartitionListHead);
-					nRet = 0;
-                }
+            	if (strlen(pSeek) == 3)
+            		strcpy(diskName, pSeek);
+            	else if (strlen(pSeek) > 3)
+            	{
+            		// if sub partitons exist, remove entire partition
+            		if (strstr(pSeek, diskName))
+            		{
+            			UsbPartitionInfo_t *pos = NULL;
+            			UsbPartitionInfo_t *posN = NULL;
+
+            			list_for_each_entry_safe(pos, posN, &g_usbPartitionListHead, partitionList)
+            			{
+            				if (!strcmp(pos->partitionName, diskName))
+            				{
+            					list_del(&pos->partitionList);
+            					free(pos);
+            					break;
+            				}
+            			}
+            		}
+            	}
+
+            	UsbPartitionInfo_t *pUsbPartitionInfo = (UsbPartitionInfo_t*)malloc(sizeof(UsbPartitionInfo_t));
+				memset(pUsbPartitionInfo, 0, sizeof(UsbPartitionInfo_t));
+				INIT_LIST_HEAD(&pUsbPartitionInfo->partitionList);
+				memcpy(pUsbPartitionInfo->partitionName, pSeek, strlen(pSeek));
+				list_add_tail(&pUsbPartitionInfo->partitionList, &g_usbPartitionListHead);
+				nRet = 0;
             }
         }
 
@@ -281,4 +300,7 @@ int SSTAR_DeinitUsbDev()
 {
     return AutoUmountUsbDev();
 }
+
+
+
 #endif
