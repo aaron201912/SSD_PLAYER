@@ -17,6 +17,7 @@
 
 #if UI_1024_600
 #include "SAT070CP50_1024x600.h"
+//#include "SAT070JHH_1024x600.h"
 #else
 #if USE_MIPI
 #include "ST7701S_480x480_MIPI.h"

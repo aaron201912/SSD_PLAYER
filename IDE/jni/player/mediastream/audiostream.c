@@ -35,7 +35,6 @@
 
 #define 	MI_AO_PCM_BUF_SIZE_BYTE      (MI_AUDIO_MAX_SAMPLES_PER_FRAME * MI_AUDIO_MAX_FRAME_NUM * 2 * 4)
 
-static int fda;
 static void sdl_audio_callback(void *opaque, uint8_t *stream, int len);
 extern AVPacket a_flush_pkt;
 
@@ -262,11 +261,18 @@ static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
     
     af = &f->queue[(f->rindex + f->rindex_shown) % f->max_size];
 #endif
-    frame_queue_next(&is->audio_frm_queue);
+
+    if (!af->frame->channel_layout || !af->frame->sample_rate || af->frame->format == -1)
+    {
+        printf("invalid audio frame layout sample_rate and format!\n");
+        return AVERROR_EXIT;
+    }
+    enum AVSampleFormat sample_fmt = (enum AVSampleFormat)(af->frame->format);
+
     // 根据frame中指定的音频参数获取缓冲区的大小
     data_size = av_samples_get_buffer_size(NULL, af->frame->channels,   // 本行两参数：linesize，声道数
-        af->frame->nb_samples,       // 本行一参数：本帧中包含的单个声道中的样本数
-        (enum AVSampleFormat)af->frame->format, 1);       // 本行两参数：采样格式，不对齐
+                af->frame->nb_samples,       // 本行一参数：本帧中包含的单个声道中的样本数
+                sample_fmt, 1);              // 本行两参数：采样格式，不对齐
 
     // 获取声道布局
     dec_channel_layout =
@@ -277,7 +283,7 @@ static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
     // 在audio_open()函数中又有“is->audio_src = is->audio_param_tgt”
     // 此处表示：如果frame中的音频参数 == is->audio_src == is->audio_param_tgt，那音频重采样的过程就免了(因此时is->swr_ctr是NULL)
     // 　　　　　否则使用frame(源)和is->audio_param_tgt(目标)中的音频参数来设置is->swr_ctx，并使用frame中的音频参数来赋值is->audio_src
-    if (af->frame->format != is->audio_param_src.fmt ||
+    if (sample_fmt != is->audio_param_src.fmt ||
         dec_channel_layout != is->audio_param_src.channel_layout ||
         af->frame->sample_rate != is->audio_param_src.freq)
     {
@@ -288,13 +294,13 @@ static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
         // 使用frame(源)和is->audio_param_tgt(目标)中的音频参数来设置is->audio_swr_ctx
         is->audio_swr_ctx = swr_alloc_set_opts(NULL,
             is->audio_param_tgt.channel_layout, is->audio_param_tgt.fmt, is->audio_param_tgt.freq,
-            dec_channel_layout, (enum AVSampleFormat)af->frame->format, af->frame->sample_rate,
+            dec_channel_layout, sample_fmt, af->frame->sample_rate,
             0, NULL);
         if (!is->audio_swr_ctx || swr_init(is->audio_swr_ctx) < 0)
         {
             av_log(NULL, AV_LOG_ERROR,
                 "Cannot create sample rate converter for conversion of %d Hz %s %d channels to %d Hz %s %d channels!\n",
-                af->frame->sample_rate, av_get_sample_fmt_name((enum AVSampleFormat)af->frame->format), af->frame->channels,
+                af->frame->sample_rate, av_get_sample_fmt_name(sample_fmt), af->frame->channels,
                 is->audio_param_tgt.freq, av_get_sample_fmt_name(is->audio_param_tgt.fmt), is->audio_param_tgt.channels);
             swr_free(&is->audio_swr_ctx);
             return -1;
@@ -303,7 +309,7 @@ static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
         is->audio_param_src.channel_layout = dec_channel_layout;
         is->audio_param_src.channels = af->frame->channels;
         is->audio_param_src.freq = af->frame->sample_rate;
-        is->audio_param_src.fmt = (enum AVSampleFormat)af->frame->format;
+        is->audio_param_src.fmt = sample_fmt;
 
     }
 
@@ -333,7 +339,6 @@ static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
         }
         //printf("tgt count: %d,channel: %d,size: %d\n",out_count,is->audio_param_tgt.channels,is->audio_frm_rwr_size);
         //printf("in count: %d,channel: %d\n",af->frame->nb_samples,af->frame->channels);
-
         // 音频重采样：返回值是重采样后得到的音频数据中单个声道的样本数
         len2 = swr_convert(is->audio_swr_ctx, out, out_count, in, af->frame->nb_samples);
         if (len2 < 0)
@@ -386,6 +391,8 @@ static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
         last_clock = is->audio_clock;
     }
 #endif
+    frame_queue_next(&is->audio_frm_queue);
+
     return resampled_data_size;
 fail:
     av_freep(&is->audio_frm_rwr);
@@ -413,6 +420,8 @@ static void* audio_playing_thread(void *arg)
         audio_size = audio_resample(is, audio_callback_time);
         if (audio_size == AVERROR_EOF)
             break;
+        else if (audio_size == AVERROR_EXIT)
+            continue;
         else if (audio_size < 0)
         {
             /* if error, just output silence */

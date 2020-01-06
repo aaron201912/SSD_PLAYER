@@ -20,7 +20,6 @@
 #include <sys/stat.h>
 
 
-static int fdv;
 extern AVPacket v_flush_pkt;
 
 
@@ -115,6 +114,12 @@ static int video_decode_frame(AVCodecContext *p_codec_ctx, packet_queue_t *p_pkt
         {
             // 复位解码器内部状态/刷新内部缓冲区。
             avcodec_flush_buffers(p_codec_ctx);
+
+            if (p_codec_ctx->codec_id == AV_CODEC_ID_H264 || p_codec_ctx->codec_id == AV_CODEC_ID_HEVC)
+            {
+                if (p_codec_ctx->codec->flush)
+                    p_codec_ctx->codec->flush(p_codec_ctx);
+            }
             printf("avcodec_flush_buffers for video!\n");
         }
         else
@@ -160,7 +165,7 @@ static void* video_decode_thread(void *arg)
     if (p_frame == NULL)
     {
         av_log(NULL, AV_LOG_ERROR, "av_frame_alloc() for p_frame failed\n");
-        printf("%s[%s] %s: no memory\n", __FILE__, __LINE__, __FUNCTION__);
+        printf("%s[%d] %s: no memory\n", __FILE__, __LINE__, __FUNCTION__);
         return NULL;
     }
 
@@ -237,12 +242,14 @@ static double compute_target_delay(double delay, player_stat_t *is)
     sync_threshold = FFMAX(AV_SYNC_THRESHOLD_MIN, FFMIN(AV_SYNC_THRESHOLD_MAX, delay));
     if (!isnan(diff))
     {
-        if (diff <= -sync_threshold)        // 视频时钟落后于同步时钟，且超过同步域值
-            delay_tim = FFMAX(0, delay + diff); // 当前帧播放时刻落后于同步时钟(delay+diff<0)则delay=0(视频追赶，立即播放)，否则delay=delay+diff
-        else if (diff >= sync_threshold && delay > AV_SYNC_FRAMEDUP_THRESHOLD)  // 视频时钟超前于同步时钟，且超过同步域值，但上一帧播放时长超长
-            delay_tim = delay + diff;           // 仅仅校正为delay=delay+diff，主要是AV_SYNC_FRAMEDUP_THRESHOLD参数的作用
-        else if (diff >= sync_threshold)    // 视频时钟超前于同步时钟，且超过同步域值
-            delay_tim = 2 * delay;              // 视频播放要放慢脚步，delay扩大至2倍
+        if (diff <= -sync_threshold)                // 视频时钟落后于同步时钟,且超过同步域值
+            delay_tim = FFMAX(0, delay + diff);     // 当前帧播放时刻落后于同步时钟(delay+diff<0)则delay=0(视频追赶，立即播放)，否则delay=delay+diff
+        else if (diff > 0 && diff < sync_threshold) // 视频时钟超前于同步时钟,在同步时钟域内
+            delay_tim = diff;
+        else if (diff >= sync_threshold)            // 视频时钟超前于同步时钟,且超过同步域值
+            delay_tim = 2 * delay;                  // 视频播放要放慢脚步，delay扩大至2倍
+        else if (diff > AV_SYNC_FRAMEDUP_THRESHOLD) // 视频时钟超前于同步时钟超过最大值,说明发生跳转
+            delay_tim = AV_SYNC_FRAMEDUP_THRESHOLD;
     }
     //printf("video: delay=%0.3f A-V=%f\n", delay_tim, -diff);
 
@@ -274,6 +281,11 @@ static void video_display(player_stat_t *is)
     uint8_t *frame_ydata, *frame_uvdata;
 
     vp = frame_queue_peek_last(&is->video_frm_queue);
+    if (!vp->frame->width || !vp->frame->height)
+    {
+        printf("invalid video frame width and height!\n");
+        return;
+    }
     //printf("get vp disp ridx: %d,format: %d\n",is->video_frm_queue.rindex,vp->frame->format);
 
     // 图像转换：p_frm_raw->data ==> p_frm_yuv->data
@@ -308,18 +320,17 @@ static void video_display(player_stat_t *is)
 }
 
 /* called to display each frame */
-static void video_refresh(void *opaque, double *remaining_time)
+static void video_refresh(void *opaque, double *remaining_time, double duration)
 {
-
     player_stat_t *is = (player_stat_t *)opaque;
-    double time;
-    //static bool first_frame = true;
+    double time, delay;
+    frame_t *vp;
 
 retry:
     // 暂停处理：不停播放上一帧图像
     if (is->paused)
-        goto display;
-        
+        return;
+
     if (frame_queue_nb_remaining(&is->video_frm_queue) <= 0)  // 所有帧已显示
     {    
         // if file is eof and there is no paket in queue, then do complete
@@ -330,26 +341,12 @@ retry:
         }
         return;
     }
-
-    double last_duration, duration, delay;
-    frame_t *vp, *lastvp;
-
     /* dequeue the picture */
-    lastvp = frame_queue_peek_last(&is->video_frm_queue);     // 上一帧：上次已显示的帧
     vp = frame_queue_peek(&is->video_frm_queue);              // 当前帧：当前待显示的帧
     //printf("refresh ridx: %d,rs:%d,widx: %d,size: %d,maxsize: %d\n",is->video_frm_queue.rindex,is->video_frm_queue.rindex_shown,is->video_frm_queue.windex,is->video_frm_queue.size,is->video_frm_queue.max_size);
-    //printf("lastpos: %ld,lastpts: %lf,vppos: %ld,vppts: %lf\n",lastvp->pos,lastvp->pts,vp->pos,vp->pts);
     // lastvp和vp不是同一播放序列(一个seek会开始一个新播放序列)，将frame_timer更新为当前时间
-    //if (first_frame)
-    //{
-    //    is->frame_timer = av_gettime_relative() / 1000000.0;
-    //    first_frame = false;
-    //}
-
     /* compute nominal last_duration */
-    last_duration = vp_duration(is, lastvp, vp);        // 上一帧播放时长：vp->pts - lastvp->pts
-    delay = compute_target_delay(last_duration, is);    // 根据视频时钟和同步时钟的差值，计算delay值
-    //printf("last_duration: %d,delay: %d\n",last_duration,delay);
+    delay = compute_target_delay(duration, is);    // 根据视频时钟和同步时钟的差值，计算delay值
     time= av_gettime_relative()/1000000.0;
     // 当前帧播放时刻(is->frame_timer+delay)大于当前时刻(time)，表示播放时刻未到
     if (time < is->frame_timer + delay) {
@@ -391,8 +388,6 @@ retry:
     // 是否要丢弃未能及时播放的视频帧
     if (frame_queue_nb_remaining(&is->video_frm_queue) > 1)  // 队列中未显示帧数>1(只有一帧则不考虑丢帧)
     {
-        frame_t *nextvp = frame_queue_peek_next(&is->video_frm_queue);  // 下一帧：下一待显示的帧
-        duration = vp_duration(is, vp, nextvp);             // 当前帧vp播放时长 = nextvp->pts - vp->pts
         // 当前帧vp未能及时播放，即下一帧播放时刻(is->frame_timer+duration)小于当前系统时刻(time)
         if (time > is->frame_timer + duration)
         {
@@ -403,21 +398,21 @@ retry:
     }
     // 删除当前读指针元素，读指针+1。若未丢帧，读指针从lastvp更新到vp；若有丢帧，读指针从vp更新到nextvp
     frame_queue_next(&is->video_frm_queue);
-    
+
     if (is->step && !is->paused)
     {
         stream_toggle_pause(is);
     }
 
-display:
     video_display(is);                      // 取出当前帧vp(若有丢帧是nextvp)进行播放
-    
 }
 
-static int video_refresh_async(void *opaque, double *remaining_time, AVPacket *packet, AVFrame *frame, double duration)
+static int video_refresh_async(void *opaque, double *remaining_time, double duration)
 {
     player_stat_t *is = (player_stat_t *)opaque;
     AVRational tb = is->p_video_stream->time_base;
+    AVPacket *packet = av_packet_alloc();
+    AVFrame *frame = av_frame_alloc();
     double delay, time, pts;
     uint8_t *frame_ydata, *frame_uvdata;
     int ret;
@@ -473,6 +468,11 @@ static int video_refresh_async(void *opaque, double *remaining_time, AVPacket *p
     {
         // 复位解码器内部状态/刷新内部缓冲区。
         avcodec_flush_buffers(is->p_vcodec_ctx);
+        if (is->decode_type == HARD_DECODING)
+        {
+            if (is->p_vcodec_ctx->codec->flush)
+                is->p_vcodec_ctx->codec->flush(is->p_vcodec_ctx);
+        }
         printf("avcodec_flush_buffers for video!\n");
     }
     else
@@ -493,7 +493,6 @@ static int video_refresh_async(void *opaque, double *remaining_time, AVPacket *p
         {
             av_log(NULL, AV_LOG_ERROR, "receive_frame and send_packet both returned EAGAIN, which is an API violation.\n");
         }
-        av_packet_unref(packet);
 
         ret = avcodec_receive_frame(is->p_vcodec_ctx, frame);
         if (ret < 0)
@@ -564,9 +563,12 @@ static int video_refresh_async(void *opaque, double *remaining_time, AVPacket *p
                     is->playerController.fpDisplayVideo(frame->width, frame->height, frame_ydata, frame_uvdata);
                 }
             }
-            av_frame_unref(frame);
         }
     }
+
+    av_packet_free(&packet);
+    av_frame_free(&frame);
+
     if (is->step && !is->paused)
     {
         stream_toggle_pause(is);
@@ -578,10 +580,9 @@ static int video_refresh_async(void *opaque, double *remaining_time, AVPacket *p
 static void* video_playing_thread(void *arg)
 {
     player_stat_t *is = (player_stat_t *)arg;
-    AVFrame *p_frame = av_frame_alloc();
-    AVPacket pkt;
     AVRational frame_rate = av_guess_frame_rate(is->p_fmt_ctx, is->p_video_stream, NULL);
     double remaining_time = 0.0;
+
     double duration = av_q2d((AVRational){frame_rate.den, frame_rate.num});
     printf("video image rate time: %.3lf\n", duration);
 
@@ -603,26 +604,30 @@ static void* video_playing_thread(void *arg)
         // 立即显示当前帧，或延时remaining_time后再显示
 
         #if ENABLE_SMALL
-        video_refresh_async(is, &remaining_time, &pkt, p_frame, duration);
+        video_refresh_async(is, &remaining_time, duration);
         #else
-        video_refresh(is, &remaining_time);
+        video_refresh(is, &remaining_time, duration);
         #endif
     }
-
-    av_frame_free(&p_frame);
 
     return NULL;
 }
 
 static int open_video_playing(void *arg)
 {
-
     player_stat_t *is = (player_stat_t *)arg;
     int ret;
     int buf_size;
     uint8_t* buffer = NULL;
     AVPixFmtDescriptor *desc;
-    
+
+    is->p_frm_yuv = av_frame_alloc();
+    if (is->p_frm_yuv == NULL)
+    {
+        printf("av_frame_alloc() for p_frm_raw failed\n");
+        return -1;
+    }
+
     // 为AVFrame.*data[]手工分配缓冲区，用于存储sws_scale()中目的帧视频数据
     buf_size = av_image_get_buffer_size(AV_PIX_FMT_NV12,
                                         is->p_vcodec_ctx->width,
@@ -752,11 +757,10 @@ static int open_video_stream(player_stat_t *is)
     is->p_vcodec_ctx = p_codec_ctx;
     is->p_vcodec_ctx->debug  = true;
 
-    #if SUPPORT_B_FRAME
-    is->p_vcodec_ctx->flags |= (1 << 6);  // 通过此标志获取B frame
-    #else
-    is->p_vcodec_ctx->flags  = 0; 
-    #endif
+    if (is->p_vcodec_ctx->has_b_frames > 0)
+        is->p_vcodec_ctx->flags |= (1 << 6);  // 通过此标志获取B frame
+    else
+        is->p_vcodec_ctx->flags  = 0; 
 
     is->p_vcodec_ctx->flags2 = 0;
     printf("codec width: %d,height: %d\n",is->p_vcodec_ctx->width,is->p_vcodec_ctx->height);

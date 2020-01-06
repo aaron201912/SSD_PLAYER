@@ -172,6 +172,8 @@ static void stream_component_close(player_stat_t *is, int stream_index)
         break;
     case AVMEDIA_TYPE_VIDEO:
         video_decoder_abort(is);
+        sws_freeContext(is->img_convert_ctx);
+        av_frame_free(&is->p_frm_yuv);
         break;
 
     default:
@@ -213,8 +215,7 @@ static void* idle_thread(void *arg)
             if (is->playerController.fpPlayError)
             {
                 is->playerController.fpPlayError(is->play_error);
-                if (is)
-                    is->play_error = 0;
+                is->play_error = 0;
             }
         }
         else
@@ -282,14 +283,8 @@ player_stat_t *player_init(const char *p_input_file)
     init_clock(&is->audio_clk, &is->audio_pkt_queue.serial);
 
     is->abort_request = 0;
-    is->p_frm_yuv = av_frame_alloc();
-    if (is->p_frm_yuv == NULL)
-    {
-        printf("av_frame_alloc() for p_frm_raw failed\n");
-        goto fail;
-    }
-    is->av_sync_type = av_sync_type;
-    is->play_error = 0;
+    is->av_sync_type  = av_sync_type;
+    is->play_error    = 0;
 
     pthread_create(&is->idle_tid, NULL, idle_thread, is);
 
@@ -300,7 +295,7 @@ fail:
     frame_queue_destory(&is->audio_frm_queue);
     packet_queue_flush(&is->video_pkt_queue);
     packet_queue_flush(&is->audio_pkt_queue);
-    av_frame_free(&is->p_frm_yuv);
+    pthread_cond_destroy(&is->continue_read_thread);
     av_freep(&is);
 
     return NULL;
@@ -315,7 +310,7 @@ int player_deinit(player_stat_t *is)
     is->abort_request = 1;
     
     // 如果运行期间没有错误或者解码速度不够,按正常流程退出
-    if (!is->play_error || is->play_error == -3)
+    if (true == is->demux_status)
     {
         pthread_join(is->read_tid, NULL);
 
@@ -332,25 +327,29 @@ int player_deinit(player_stat_t *is)
         }
 
         avformat_close_input(&is->p_fmt_ctx);
+        printf("avformat_close_input finish!\n");
 
-        sws_freeContext(is->img_convert_ctx);
+//        dd_meminfo();
+//        printf("[%s %d]\n", __FUNCTION__, __LINE__);
     }
     /* free all pictures */
     packet_queue_destroy(&is->video_pkt_queue);
-    
+    printf("video packet_queue_destroy!\n");
     packet_queue_destroy(&is->audio_pkt_queue);
-
+    printf("audio packet_queue_destroy!\n");
     frame_queue_destory(&is->video_frm_queue);
-
+    printf("video frame_queue_destory!\n");
     frame_queue_destory(&is->audio_frm_queue);
-
+    printf("audio frame_queue_destory!\n");
     pthread_cond_destroy(&is->continue_read_thread);
-
-    av_frame_free(&is->p_frm_yuv);
-
+    printf("pthread_cond_destroy!\n");
     av_free(is->filename);
-
+    printf("av_free filename!\n");
     av_freep(&is);
+    printf("av_free is!\n");
+
+//    dd_meminfo();
+//    printf("[%s %d]\n", __FUNCTION__, __LINE__);
 
     return 0;
 }

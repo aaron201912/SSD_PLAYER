@@ -1,6 +1,7 @@
 ﻿#ifdef SUPPORT_PLAYER_MODULE
 #include "demux.h"
 #include "packet.h"
+#include "frame.h"
 #include <sys/time.h>
 
 extern AVPacket a_flush_pkt, v_flush_pkt;
@@ -56,6 +57,8 @@ static int demux_init(player_stat_t *is)
     }
 
     // get media duration
+    if (is->p_fmt_ctx->start_time == AV_NOPTS_VALUE)
+        is->p_fmt_ctx->start_time = 0;
     printf("probesize is %lld, duration is %lld ms, start_time is %lld\n", is->p_fmt_ctx->probesize, is->p_fmt_ctx->duration, is->p_fmt_ctx->start_time);
     if (is->playerController.fpGetDuration)
         is->playerController.fpGetDuration(is->p_fmt_ctx->duration);
@@ -89,6 +92,7 @@ static int demux_init(player_stat_t *is)
 
     totle_seconds = p_fmt_ctx->duration * av_q2d(AV_TIME_BASE_Q);
     printf("total time of file : %f\n", totle_seconds);
+    av_dump_format(p_fmt_ctx, 0, p_fmt_ctx->filename, 0);
 
     is->audio_complete = 1;
     is->video_complete = 1;
@@ -243,10 +247,13 @@ static void* demux_thread(void *arg)
                 if (is->audio_idx >= 0) {
                     packet_queue_flush(&is->audio_pkt_queue);
                     packet_queue_put(&is->audio_pkt_queue, &a_flush_pkt);
+                    frame_queue_flush(&is->audio_frm_queue);
                 }
                 if (is->video_idx >= 0) {
                     packet_queue_flush(&is->video_pkt_queue);
                     packet_queue_put(&is->video_pkt_queue, &v_flush_pkt);
+                    frame_queue_flush(&is->video_frm_queue);
+                    is->p_vcodec_ctx->flags |= (1 << 7);
                 }
                 /*
                 if (is->seek_flags & AVSEEK_FLAG_BYTE) {
@@ -286,8 +293,8 @@ static void* demux_thread(void *arg)
             //printf("queue size: %d\n",is->audio_pkt_queue.size + is->video_pkt_queue.size);
             //printf("wait video queue avalible pktnb: %d\n",is->video_pkt_queue.nb_packets);
             //printf("wait audio queue avalible pktnb: %d\n",is->audio_pkt_queue.nb_packets);
-            //if (is->audio_pkt_queue.nb_packets == 0 && is->video_pkt_queue.nb_packets >= MIN_FRAMES)
-            if (is->audio_pkt_queue.size + is->video_pkt_queue.size > MAX_QUEUE_SIZE)
+            if (is->audio_pkt_queue.size + is->video_pkt_queue.size > MAX_QUEUE_SIZE &&
+                is->audio_pkt_queue.nb_packets == 0)
             {
                 av_log(NULL, AV_LOG_WARNING, "WARNING: Please Reduce The Resolution Of Video!!!\n");
                 is->play_error = -3;
@@ -361,9 +368,10 @@ int open_demux(player_stat_t *is)
     {
         printf("demux_init() failed\n");
         is->play_error = ret;    // 更新错误代号
+        is->demux_status = false;
         return -1;
     }
-
+    is->demux_status = true;
     CheckFuncResult(pthread_create(&is->read_tid, NULL, demux_thread, is));
 
     return 0;

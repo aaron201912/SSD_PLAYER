@@ -216,6 +216,7 @@ typedef struct {
 
     int decode_type;
     int play_error;
+    bool demux_status;
 
     player_control_t playerController;
 }   player_stat_t;
@@ -228,6 +229,8 @@ void set_clock_at(play_clock_t *c, double pts, int serial, double time);
 void set_clock(play_clock_t *c, double pts, int serial);
 void stream_toggle_pause(player_stat_t *is);
 void stream_seek(player_stat_t *is, int64_t pos, int64_t rel, int seek_by_bytes);
+
+void dd_meminfo(void);
 
 #endif
 

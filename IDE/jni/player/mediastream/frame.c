@@ -39,6 +39,25 @@ void frame_queue_destory(frame_queue_t *f)
     pthread_cond_destroy(&f->cond);
 }
 
+void frame_queue_flush(frame_queue_t *f)
+{
+    //printf("queue valid size : %d, rindex : %d\n", f->size, f->rindex);
+    pthread_mutex_lock(&f->mutex);
+    for (; f->size > 0; f->size --)
+    {
+        frame_t *vp = &f->queue[(f->rindex ++) % f->max_size];
+        frame_queue_unref_item(vp);
+        if (f->rindex >= f->max_size)
+            f->rindex = 0;
+    }
+    f->rindex = 0;
+    f->rindex_shown = 0;
+    f->windex = 0;
+    f->size   = 0;
+    pthread_cond_signal(&f->cond);
+    pthread_mutex_unlock(&f->mutex);
+}
+
 void frame_queue_signal(frame_queue_t *f)
 {
     pthread_mutex_lock(&f->mutex);
