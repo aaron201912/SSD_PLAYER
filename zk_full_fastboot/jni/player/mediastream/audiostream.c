@@ -56,36 +56,36 @@ static int audio_decode_frame(AVCodecContext *p_codec_ctx, packet_queue_t *p_pkt
             // 3.2 一个音频packet含一至多个音频frame，每次avcodec_receive_frame()返回一个frame，此函数返回。
             // 下次进来此函数，继续获取一个frame，直到avcodec_receive_frame()返回AVERROR(EAGAIN)，
             // 表示解码器需要填入新的音频packet
-            ret = avcodec_receive_frame(p_codec_ctx, frame);
+            ret = AvCodecLibInfo.avcodec_receive_frame(p_codec_ctx, frame);
             if (ret >= 0)
             {
                 // 时基转换，从d->avctx->pkt_timebase时基转换到1/frame->sample_rate时基
                 AVRational tb = (AVRational) { 1, frame->sample_rate };
                 if (frame->pts != AV_NOPTS_VALUE)
                 {
-                    frame->pts = av_rescale_q(frame->pts, p_codec_ctx->pkt_timebase, tb);
+                    frame->pts = AvUtilLibInfo.av_rescale_q(frame->pts, p_codec_ctx->pkt_timebase, tb);
                 }
                 else
                 {
-                    //av_log(NULL, AV_LOG_WARNING, "frame->pts no\n");
+                    //AvUtilLibInfo.av_log(NULL, AV_LOG_WARNING, "frame->pts no\n");
                 }
 
                 return 1;
             }
             else if (ret == AVERROR_EOF)
             {
-                av_log(NULL, AV_LOG_INFO, "audio avcodec_receive_frame(): the decoder has been flushed\n");
-                avcodec_flush_buffers(p_codec_ctx);
+                AvUtilLibInfo.av_log(NULL, AV_LOG_INFO, "audio AvCodecLibInfo.avcodec_receive_frame(): the decoder has been flushed\n");
+                AvCodecLibInfo.avcodec_flush_buffers(p_codec_ctx);
                 return 0;
             }
             else if (ret == AVERROR(EAGAIN))
             {
-                //av_log(NULL, AV_LOG_INFO, "audio avcodec_receive_frame(): input is not accepted in the current state\n");
+                //AvUtilLibInfo.av_log(NULL, AV_LOG_INFO, "audio AvCodecLibInfo.avcodec_receive_frame(): input is not accepted in the current state\n");
                 break;
             }
             else
             {
-                av_log(NULL, AV_LOG_ERROR, "audio avcodec_receive_frame(): other errors\n");
+                AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR, "audio AvCodecLibInfo.avcodec_receive_frame(): other errors\n");
                 continue;
             }
         }
@@ -102,19 +102,19 @@ static int audio_decode_frame(AVCodecContext *p_codec_ctx, packet_queue_t *p_pkt
         if (pkt.data == a_flush_pkt.data)
         {
             // 复位解码器内部状态/刷新内部缓冲区。当seek操作或切换流时应调用此函数。
-            avcodec_flush_buffers(p_codec_ctx);
-            printf("avcodec_flush_buffers for audio!\n");
+            AvCodecLibInfo.avcodec_flush_buffers(p_codec_ctx);
+            printf("AvCodecLibInfo.avcodec_flush_buffers for audio!\n");
         }
         else
         {
             // 2. 将packet发送给解码器
             //    发送packet的顺序是按dts递增的顺序，如IPBBPBB
             //    pkt.pos变量可以标识当前packet在视频文件中的地址偏移
-            if (avcodec_send_packet(p_codec_ctx, &pkt) == AVERROR(EAGAIN))
+            if (AvCodecLibInfo.avcodec_send_packet(p_codec_ctx, &pkt) == AVERROR(EAGAIN))
             {
-                av_log(NULL, AV_LOG_ERROR, "receive_frame and send_packet both returned EAGAIN, which is an API violation.\n");
+                AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR, "receive_frame and send_packet both returned EAGAIN, which is an API violation.\n");
             }
-            av_packet_unref(&pkt);
+            AvCodecLibInfo.av_packet_unref(&pkt);
         }
     }
 }
@@ -123,7 +123,7 @@ static int audio_decode_frame(AVCodecContext *p_codec_ctx, packet_queue_t *p_pkt
 static void* audio_decode_thread(void *arg)
 {
     player_stat_t *is = (player_stat_t *)arg;
-    AVFrame *p_frame = av_frame_alloc();
+    AVFrame *p_frame = AvUtilLibInfo.av_frame_alloc();
     frame_t *af;
 
     int got_frame = 0;
@@ -164,7 +164,7 @@ static void* audio_decode_thread(void *arg)
             af->duration = av_q2d((AVRational) { p_frame->nb_samples, p_frame->sample_rate });
             //printf("audio frame pts : %d, time pts : %f, audio duration : %f.\n", p_frame->pts, af->pts, af->duration);
             // 将frame数据拷入af->frame，af->frame指向音频frame队列尾部
-            av_frame_move_ref(af->frame, p_frame);
+            AvUtilLibInfo.av_frame_move_ref(af->frame, p_frame);
             // 更新音频frame队列大小及写指针
             frame_queue_push(&is->audio_frm_queue);
             //no need unref frame?
@@ -173,7 +173,7 @@ static void* audio_decode_thread(void *arg)
     }
 
 the_end:
-    av_frame_free(&p_frame);
+    AvUtilLibInfo.av_frame_free(&p_frame);
     return NULL;
 }
 
@@ -189,33 +189,33 @@ int open_audio_stream(player_stat_t *is)
     // 1.1 获取解码器参数AVCodecParameters
     p_codec_par = is->p_audio_stream->codecpar;
     // 1.2 获取解码器
-    p_codec = avcodec_find_decoder(p_codec_par->codec_id);
+    p_codec = AvCodecLibInfo.avcodec_find_decoder(p_codec_par->codec_id);
     if (p_codec == NULL)
     {
-        av_log(NULL, AV_LOG_ERROR, "Cann't find codec!\n");
+        AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR, "Cann't find codec!\n");
         return -1;
     }
 
     // 1.3 构建解码器AVCodecContext
     // 1.3.1 p_codec_ctx初始化：分配结构体，使用p_codec初始化相应成员为默认值
-    p_codec_ctx = avcodec_alloc_context3(p_codec);
+    p_codec_ctx = AvCodecLibInfo.avcodec_alloc_context3(p_codec);
     if (p_codec_ctx == NULL)
     {
-        av_log(NULL, AV_LOG_ERROR, "avcodec_alloc_context3() failed\n");
+        AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR, "AvCodecLibInfo.avcodec_alloc_context3() failed\n");
         return -1;
     }
     // 1.3.2 p_codec_ctx初始化：p_codec_par ==> p_codec_ctx，初始化相应成员
-    ret = avcodec_parameters_to_context(p_codec_ctx, p_codec_par);
+    ret = AvCodecLibInfo.avcodec_parameters_to_context(p_codec_ctx, p_codec_par);
     if (ret < 0)
     {
-        av_log(NULL, AV_LOG_ERROR, "avcodec_parameters_to_context() failed %d\n", ret);
+        AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR, "avcodec_parameters_to_context() failed %d\n", ret);
         return -1;
     }
     // 1.3.3 p_codec_ctx初始化：使用p_codec初始化p_codec_ctx，初始化完成
-    ret = avcodec_open2(p_codec_ctx, p_codec, NULL);
+    ret = AvCodecLibInfo.avcodec_open2(p_codec_ctx, p_codec, NULL);
     if (ret < 0)
     {
-        av_log(NULL, AV_LOG_ERROR, "avcodec_open2() failed %d\n", ret);
+        AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR, "avcodec_open2() failed %d\n", ret);
         return -1;
     }
 
@@ -264,14 +264,14 @@ static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
 #endif
     frame_queue_next(&is->audio_frm_queue);
     // 根据frame中指定的音频参数获取缓冲区的大小
-    data_size = av_samples_get_buffer_size(NULL, af->frame->channels,   // 本行两参数：linesize，声道数
+    data_size = AvUtilLibInfo.av_samples_get_buffer_size(NULL, af->frame->channels,   // 本行两参数：linesize，声道数
         af->frame->nb_samples,       // 本行一参数：本帧中包含的单个声道中的样本数
         (enum AVSampleFormat)af->frame->format, 1);       // 本行两参数：采样格式，不对齐
 
     // 获取声道布局
     dec_channel_layout =
-        (af->frame->channel_layout && af->frame->channels == av_get_channel_layout_nb_channels(af->frame->channel_layout)) ?
-        af->frame->channel_layout : av_get_default_channel_layout(af->frame->channels);
+        (af->frame->channel_layout && af->frame->channels == AvUtilLibInfo.av_get_channel_layout_nb_channels(af->frame->channel_layout)) ?
+        af->frame->channel_layout : AvUtilLibInfo.av_get_default_channel_layout(af->frame->channels);
     wanted_nb_samples = af->frame->nb_samples;
     // is->audio_param_tgt是SDL可接受的音频帧数，是audio_open()中取得的参数
     // 在audio_open()函数中又有“is->audio_src = is->audio_param_tgt”
@@ -281,22 +281,22 @@ static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
         dec_channel_layout != is->audio_param_src.channel_layout ||
         af->frame->sample_rate != is->audio_param_src.freq)
     {
-        swr_free(&is->audio_swr_ctx);
+        SwrLibInfo.swr_free(&is->audio_swr_ctx);
         //printf("in layout: %lld,format: %d,samrate: %d\n",dec_channel_layout,af->frame->format,af->frame->sample_rate);
         //printf("out layout: %lld,format: %d,samrate: %d\n",is->audio_param_tgt.channel_layout,is->audio_param_tgt.fmt,is->audio_param_tgt.freq);
 
         // 使用frame(源)和is->audio_param_tgt(目标)中的音频参数来设置is->audio_swr_ctx
-        is->audio_swr_ctx = swr_alloc_set_opts(NULL,
+        is->audio_swr_ctx = SwrLibInfo.swr_alloc_set_opts(NULL,
             is->audio_param_tgt.channel_layout, is->audio_param_tgt.fmt, is->audio_param_tgt.freq,
             dec_channel_layout, (enum AVSampleFormat)af->frame->format, af->frame->sample_rate,
             0, NULL);
-        if (!is->audio_swr_ctx || swr_init(is->audio_swr_ctx) < 0)
+        if (!is->audio_swr_ctx || SwrLibInfo.swr_init(is->audio_swr_ctx) < 0)
         {
-            av_log(NULL, AV_LOG_ERROR,
+            AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR,
                 "Cannot create sample rate converter for conversion of %d Hz %s %d channels to %d Hz %s %d channels!\n",
-                af->frame->sample_rate, av_get_sample_fmt_name((enum AVSampleFormat)af->frame->format), af->frame->channels,
-                is->audio_param_tgt.freq, av_get_sample_fmt_name(is->audio_param_tgt.fmt), is->audio_param_tgt.channels);
-            swr_free(&is->audio_swr_ctx);
+                af->frame->sample_rate, AvUtilLibInfo.av_get_sample_fmt_name((enum AVSampleFormat)af->frame->format), af->frame->channels,
+                is->audio_param_tgt.freq, AvUtilLibInfo.av_get_sample_fmt_name(is->audio_param_tgt.fmt), is->audio_param_tgt.channels);
+            SwrLibInfo.swr_free(&is->audio_swr_ctx);
             return -1;
         }
         // 使用frame中的参数更新is->audio_src，第一次更新后后面基本不用执行此if分支了，因为一个音频流中各frame通用参数一样
@@ -318,15 +318,15 @@ static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
         // 重采样输出参数：输出音频样本数(多加了256个样本)
         int out_count = (int64_t)wanted_nb_samples * is->audio_param_tgt.freq / af->frame->sample_rate + 256;
         // 重采样输出参数：输出音频缓冲区尺寸(以字节为单位)
-        int out_size = av_samples_get_buffer_size(NULL, is->audio_param_tgt.channels, out_count, is->audio_param_tgt.fmt, 0);
+        int out_size = AvUtilLibInfo.av_samples_get_buffer_size(NULL, is->audio_param_tgt.channels, out_count, is->audio_param_tgt.fmt, 0);
         int len2;
         if (out_size < 0)
         {
-            av_log(NULL, AV_LOG_ERROR, "av_samples_get_buffer_size() failed\n");
+            AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR, "AvUtilLibInfo.av_samples_get_buffer_size() failed\n");
             return -1;
         }
 
-        av_fast_mallocz(&is->audio_frm_rwr, &is->audio_frm_rwr_size, out_size);
+        AvUtilLibInfo.av_fast_mallocz(&is->audio_frm_rwr, &is->audio_frm_rwr_size, out_size);
         if (!is->audio_frm_rwr)
         {
             return AVERROR(ENOMEM);
@@ -335,25 +335,25 @@ static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
         //printf("in count: %d,channel: %d\n",af->frame->nb_samples,af->frame->channels);
 
         // 音频重采样：返回值是重采样后得到的音频数据中单个声道的样本数
-        len2 = swr_convert(is->audio_swr_ctx, out, out_count, in, af->frame->nb_samples);
+        len2 = SwrLibInfo.swr_convert(is->audio_swr_ctx, out, out_count, in, af->frame->nb_samples);
         if (len2 < 0)
         {
-            av_log(NULL, AV_LOG_ERROR, "swr_convert() failed\n");
+            AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR, "SwrLibInfo.swr_convert() failed\n");
             goto fail;
         }
 
         if (len2 == out_count)
         {
-            av_log(NULL, AV_LOG_WARNING, "audio buffer is probably too small\n");
-            if (swr_init(is->audio_swr_ctx) < 0)
-                swr_free(&is->audio_swr_ctx);
+            AvUtilLibInfo.av_log(NULL, AV_LOG_WARNING, "audio buffer is probably too small\n");
+            if (SwrLibInfo.swr_init(is->audio_swr_ctx) < 0)
+                SwrLibInfo.swr_free(&is->audio_swr_ctx);
             //goto fail;
         }
 
         is->p_audio_frm = is->audio_frm_rwr;
 
         // 重采样返回的一帧音频数据大小(以字节为单位)
-        resampled_data_size = len2 * is->audio_param_tgt.channels * av_get_bytes_per_sample(is->audio_param_tgt.fmt);
+        resampled_data_size = len2 * is->audio_param_tgt.channels * AvUtilLibInfo.av_get_bytes_per_sample(is->audio_param_tgt.fmt);
 
     }
     else
@@ -388,7 +388,7 @@ static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
 #endif
     return resampled_data_size;
 fail:
-    av_freep(&is->audio_frm_rwr);
+    AvUtilLibInfo.av_freep(&is->audio_frm_rwr);
     return -1;
 }
 
@@ -408,7 +408,7 @@ static void* audio_playing_thread(void *arg)
             printf("audio play thread exit\n");
             break;
         }
-        int64_t audio_callback_time = av_gettime_relative();
+        int64_t audio_callback_time = AvUtilLibInfo.av_gettime_relative();
 
         audio_size = audio_resample(is, audio_callback_time);
         if (audio_size == AVERROR_EOF)
@@ -466,7 +466,7 @@ static void* audio_playing_thread(void *arg)
             if (is->playerController.fpGetCurrentPlayPosFromAudio)
             {
                 long long audioPts = (long long)(is->audio_clk.pts * 1000000LL) - is->p_fmt_ctx->start_time;
-                long long frame_duration = 1000000 / (AUDIO_INPUT_SAMPRATE * av_get_bytes_per_sample(is->audio_param_tgt.fmt) / is->audio_frm_size);
+                long long frame_duration = 1000000 / (AUDIO_INPUT_SAMPRATE * AvUtilLibInfo.av_get_bytes_per_sample(is->audio_param_tgt.fmt) / is->audio_frm_size);
 
                 if (is->playerController.fpGetCurrentPlayPosFromAudio)
                     is->playerController.fpGetCurrentPlayPosFromAudio(audioPts, frame_duration);
@@ -494,15 +494,15 @@ static int open_audio_playing(void *arg)
     is->audio_param_tgt.freq = AUDIO_INPUT_SAMPRATE;
     is->audio_param_tgt.channel_layout = AUDIO_INPUT_CHLAYOUT;
 
-    is->audio_param_tgt.channels = av_get_channel_layout_nb_channels(is->audio_param_tgt.channel_layout);
+    is->audio_param_tgt.channels = AvUtilLibInfo.av_get_channel_layout_nb_channels(is->audio_param_tgt.channel_layout);
 
-    is->audio_param_tgt.frame_size = av_samples_get_buffer_size(NULL, is->audio_param_tgt.channels, 1, is->audio_param_tgt.fmt, 1);
+    is->audio_param_tgt.frame_size = AvUtilLibInfo.av_samples_get_buffer_size(NULL, is->audio_param_tgt.channels, 1, is->audio_param_tgt.fmt, 1);
 
-    is->audio_param_tgt.bytes_per_sec = av_samples_get_buffer_size(NULL, is->audio_param_tgt.channels, is->audio_param_tgt.freq, is->audio_param_tgt.fmt, 1);
+    is->audio_param_tgt.bytes_per_sec = AvUtilLibInfo.av_samples_get_buffer_size(NULL, is->audio_param_tgt.channels, is->audio_param_tgt.freq, is->audio_param_tgt.fmt, 1);
 
     if (is->audio_param_tgt.bytes_per_sec <= 0 || is->audio_param_tgt.frame_size <= 0)
     {
-        av_log(NULL, AV_LOG_ERROR, "av_samples_get_buffer_size failed\n");
+        AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR, "AvUtilLibInfo.av_samples_get_buffer_size failed\n");
         return -1;
     }
     is->audio_param_src = is->audio_param_tgt;
@@ -527,7 +527,7 @@ static void sdl_audio_callback(void *opaque, uint8_t *stream, int len)
     player_stat_t *is = (player_stat_t *)opaque;
     int audio_size, len1;
 
-    int64_t audio_callback_time = av_gettime_relative();
+    int64_t audio_callback_time = AvUtilLibInfo.av_gettime_relative();
 
     while (len > 0) // 输入参数len等于is->audio_hw_buf_size，是audio_open()中申请到的SDL音频缓冲区大小
     {

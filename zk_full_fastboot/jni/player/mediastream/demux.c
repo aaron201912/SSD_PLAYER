@@ -20,7 +20,7 @@ static int demux_init(player_stat_t *is)
     int a_idx = -1;
     int v_idx = -1;
 
-    p_fmt_ctx = avformat_alloc_context();
+    p_fmt_ctx = AvFormatLibInfo.avformat_alloc_context();
     if (!p_fmt_ctx)
     {
         printf("Could not allocate context.\n");
@@ -34,23 +34,23 @@ static int demux_init(player_stat_t *is)
 
     // 1. 构建AVFormatContext
     // 1.1 打开视频文件：读取文件头，将文件格式信息存储在"fmt context"中
-    err = avformat_open_input(&p_fmt_ctx, is->filename, NULL, NULL);
+    err = AvFormatLibInfo.avformat_open_input(&p_fmt_ctx, is->filename, NULL, NULL);
     if (err < 0)
     {
         if (err == -101)
-            av_log(NULL, AV_LOG_WARNING, "WARNING: Network Is Not Reachable!!!\n");
+            AvUtilLibInfo.av_log(NULL, AV_LOG_WARNING, "WARNING: Network Is Not Reachable!!!\n");
         else
-            printf("avformat_open_input() failed %d\n", err);
+            printf("AvFormatLibInfo.avformat_open_input() failed %d\n", err);
         ret = err;
         goto fail;
     }
     is->p_fmt_ctx = p_fmt_ctx;
     // 1.2 搜索流信息：读取一段视频文件数据，尝试解码，将取到的流信息填入p_fmt_ctx->streams
     //     ic->streams是一个指针数组，数组大小是pFormatCtx->nb_streams
-    err = avformat_find_stream_info(p_fmt_ctx, NULL);
+    err = AvFormatLibInfo.avformat_find_stream_info(p_fmt_ctx, NULL);
     if (err < 0)
     {
-        printf("avformat_find_stream_info() failed %d\n", err);
+        printf("AvFormatLibInfo.avformat_find_stream_info() failed %d\n", err);
         ret = -1;
         goto fail;
     }
@@ -120,7 +120,7 @@ static int demux_init(player_stat_t *is)
         {
             if (p_codec_par->width >= 1366 && p_codec_par->height >= 768)
             {
-                av_log(NULL, AV_LOG_WARNING, "WARNNING: The resolution of video is over 720P!!!\n");
+                AvUtilLibInfo.av_log(NULL, AV_LOG_WARNING, "WARNNING: The resolution of video is over 720P!!!\n");
                 ret = -2;
                 goto fail;
             }
@@ -137,7 +137,7 @@ static int demux_init(player_stat_t *is)
 fail:
     if (p_fmt_ctx != NULL)
     {
-        avformat_close_input(&p_fmt_ctx);
+        AvFormatLibInfo.avformat_close_input(&p_fmt_ctx);
     }
     return ret;
 }
@@ -198,11 +198,11 @@ static void* demux_thread(void *arg)
             is->last_paused = is->paused;
             if (is->paused)
             {
-                is->read_pause_return = av_read_pause(is->p_fmt_ctx);
+                is->read_pause_return = AvFormatLibInfo.av_read_pause(is->p_fmt_ctx);
             }
             else
             {
-                av_read_play(is->p_fmt_ctx);
+                AvFormatLibInfo.av_read_play(is->p_fmt_ctx);
             }
         }
 
@@ -233,11 +233,11 @@ static void* demux_thread(void *arg)
             // FIXME the +-2 is due to rounding being not done in the correct direction in generation
             // of the seek_pos/seek_rel variables
 
-            ret = avformat_seek_file(is->p_fmt_ctx, -1, seek_min, seek_target, seek_max, is->seek_flags);
+            ret = AvFormatLibInfo.avformat_seek_file(is->p_fmt_ctx, -1, seek_min, seek_target, seek_max, is->seek_flags);
             //ret = av_seek_frame(is->p_fmt_ctx, is->video_idx, seek_target, AVSEEK_FLAG_ANY);
 
             if (ret < 0) {
-                av_log(NULL, AV_LOG_ERROR,
+                AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR,
                        "%s: error while seeking\n", is->p_fmt_ctx->url);
             } else {
                 if (is->audio_idx >= 0) {
@@ -289,7 +289,7 @@ static void* demux_thread(void *arg)
             //if (is->audio_pkt_queue.nb_packets == 0 && is->video_pkt_queue.nb_packets >= MIN_FRAMES)
             if (is->audio_pkt_queue.size + is->video_pkt_queue.size > MAX_QUEUE_SIZE)
             {
-                av_log(NULL, AV_LOG_WARNING, "WARNING: Please Reduce The Resolution Of Video!!!\n");
+                AvUtilLibInfo.av_log(NULL, AV_LOG_WARNING, "WARNING: Please Reduce The Resolution Of Video!!!\n");
                 is->play_error = -3;
             }
 
@@ -297,10 +297,10 @@ static void* demux_thread(void *arg)
         }
 
         // 4.1 从输入文件中读取一个packet
-        ret = av_read_frame(is->p_fmt_ctx, pkt);
+        ret = AvFormatLibInfo.av_read_frame(is->p_fmt_ctx, pkt);
         if (ret < 0)
         {
-            if (((ret == AVERROR_EOF) || avio_feof(is->p_fmt_ctx->pb)) && !is->eof)
+            if (((ret == AVERROR_EOF) || AvFormatLibInfo.avio_feof(is->p_fmt_ctx->pb)) && !is->eof)
             {
                 // 输入文件已读完，则往packet队列中发送NULL packet，以冲洗(flush)解码器，否则解码器中缓存的帧取不出来
                 if (is->video_idx >= 0)
@@ -344,7 +344,7 @@ static void* demux_thread(void *arg)
         }
         else
         {
-            av_packet_unref(pkt);
+            AvCodecLibInfo.av_packet_unref(pkt);
         }
     }
 

@@ -5,7 +5,7 @@
 
 void frame_queue_unref_item(frame_t *vp)
 {
-    av_frame_unref(vp->frame);
+    AvUtilLibInfo.av_frame_unref(vp->frame);
 }
 
 int frame_queue_init(frame_queue_t *f, packet_queue_t *pktq, int max_size, int keep_last)
@@ -21,7 +21,7 @@ int frame_queue_init(frame_queue_t *f, packet_queue_t *pktq, int max_size, int k
     f->keep_last = !!keep_last;
     for (i = 0; i < f->max_size; i++)
     {
-        if (!(f->queue[i].frame = av_frame_alloc()))
+        if (!(f->queue[i].frame = AvUtilLibInfo.av_frame_alloc()))
             return AVERROR(ENOMEM);
     }
     return 0;
@@ -33,7 +33,7 @@ void frame_queue_destory(frame_queue_t *f)
     for (i = 0; i < f->max_size; i++) {
         frame_t *vp = &f->queue[i];
         frame_queue_unref_item(vp);
-        av_frame_free(&vp->frame);
+        AvUtilLibInfo.av_frame_free(&vp->frame);
     }
     pthread_mutex_destroy(&f->mutex);
     pthread_cond_destroy(&f->cond);

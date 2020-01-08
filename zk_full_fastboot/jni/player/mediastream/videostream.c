@@ -46,7 +46,7 @@ static int queue_picture(player_stat_t *is, AVFrame *src_frame, double pts, doub
     //set_default_window_size(vp->width, vp->height, vp->sar);
     
     // 将AVFrame拷入队列相应位置
-    av_frame_move_ref(vp->frame, src_frame);
+    AvUtilLibInfo.av_frame_move_ref(vp->frame, src_frame);
     //printf("queue frame fomat: %d\n",vp->frame->format);
     // 更新队列计数及写索引
     //printf("before queue ridx: %d,widx: %d,size: %d,maxsize: %d\n ",is->video_frm_queue.rindex,is->video_frm_queue.windex,is->video_frm_queue.size,is->video_frm_queue.max_size);
@@ -76,23 +76,23 @@ static int video_decode_frame(AVCodecContext *p_codec_ctx, packet_queue_t *p_pkt
             //     解码器缓存一定数量的packet后，才有解码后的frame输出
             //     frame输出顺序是按pts的顺序，如IBBPBBP
             //     frame->pkt_pos变量是此frame对应的packet在视频文件中的偏移地址，值同pkt.pos
-            ret = avcodec_receive_frame(p_codec_ctx, frame);
+            ret = AvCodecLibInfo.avcodec_receive_frame(p_codec_ctx, frame);
             if (ret < 0)
             {
                 if (ret == AVERROR_EOF)
                 {
-                    av_log(NULL, AV_LOG_INFO, "video avcodec_receive_frame(): the decoder has been fully flushed\n");
-                    avcodec_flush_buffers(p_codec_ctx);
+                    AvUtilLibInfo.av_log(NULL, AV_LOG_INFO, "video AvCodecLibInfo.avcodec_receive_frame(): the decoder has been fully flushed\n");
+                    AvCodecLibInfo.avcodec_flush_buffers(p_codec_ctx);
                     return 0;
                 }
                 else if (ret == AVERROR(EAGAIN))
                 {
-                    //av_log(NULL, AV_LOG_ERROR, "cann't fetch a frame, try again!\n");
+                    //AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR, "cann't fetch a frame, try again!\n");
                     break;
                 }
                 else
                 {
-                    av_log(NULL, AV_LOG_ERROR, "video avcodec_receive_frame(): other errors\n");
+                    AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR, "video AvCodecLibInfo.avcodec_receive_frame(): other errors\n");
                     continue;
                 }
             }
@@ -114,8 +114,8 @@ static int video_decode_frame(AVCodecContext *p_codec_ctx, packet_queue_t *p_pkt
         if (pkt.data == v_flush_pkt.data)
         {
             // 复位解码器内部状态/刷新内部缓冲区。
-            avcodec_flush_buffers(p_codec_ctx);
-            printf("avcodec_flush_buffers for video!\n");
+            AvCodecLibInfo.avcodec_flush_buffers(p_codec_ctx);
+            printf("AvCodecLibInfo.avcodec_flush_buffers for video!\n");
         }
         else
         {
@@ -134,11 +134,11 @@ static int video_decode_frame(AVCodecContext *p_codec_ctx, packet_queue_t *p_pkt
             //    发送packet的顺序是按dts递增的顺序，如IPBBPBB
             //    pkt.pos变量可以标识当前packet在视频文件中的地址偏移
             //printf("send packet to decoder!\n");
-            if (avcodec_send_packet(p_codec_ctx, &pkt) == AVERROR(EAGAIN))
+            if (AvCodecLibInfo.avcodec_send_packet(p_codec_ctx, &pkt) == AVERROR(EAGAIN))
             {
-                av_log(NULL, AV_LOG_ERROR, "receive_frame and send_packet both returned EAGAIN, which is an API violation.\n");
+                AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR, "receive_frame and send_packet both returned EAGAIN, which is an API violation.\n");
             }
-            av_packet_unref(&pkt);
+            AvCodecLibInfo.av_packet_unref(&pkt);
         }
         //printf("exit out video_decode_frame!\n");
         
@@ -149,17 +149,17 @@ static int video_decode_frame(AVCodecContext *p_codec_ctx, packet_queue_t *p_pkt
 static void* video_decode_thread(void *arg)
 {
     player_stat_t *is = (player_stat_t *)arg;
-    AVFrame *p_frame = av_frame_alloc();
+    AVFrame *p_frame = AvUtilLibInfo.av_frame_alloc();
     double pts;
     double duration;
     int ret;
     int got_picture;
     AVRational tb = is->p_video_stream->time_base;
-    AVRational frame_rate = av_guess_frame_rate(is->p_fmt_ctx, is->p_video_stream, NULL);
+    AVRational frame_rate = AvFormatLibInfo.av_guess_frame_rate(is->p_fmt_ctx, is->p_video_stream, NULL);
     
     if (p_frame == NULL)
     {
-        av_log(NULL, AV_LOG_ERROR, "av_frame_alloc() for p_frame failed\n");
+        AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR, "AvUtilLibInfo.av_frame_alloc() for p_frame failed\n");
         printf("%s[%s] %s: no memory\n", __FILE__, __LINE__, __FUNCTION__);
         return NULL;
     }
@@ -189,7 +189,7 @@ static void* video_decode_thread(void *arg)
         //printf("frame duration : %f. video frame clock : %f.\n", duration, pts);
 
         ret = queue_picture(is, p_frame, pts, duration, p_frame->pkt_pos);   // 将当前帧压入frame_queue
-        av_frame_unref(p_frame);
+        AvUtilLibInfo.av_frame_unref(p_frame);
 
         if (ret < 0)
         {
@@ -199,7 +199,7 @@ static void* video_decode_thread(void *arg)
     }
 
 exit:
-    av_frame_free(&p_frame);
+    AvUtilLibInfo.av_frame_free(&p_frame);
 
     return NULL;
 }
@@ -222,8 +222,8 @@ static double compute_target_delay(double delay, player_stat_t *is)
         return delay;
     //printf("audio pts: %lf,video pts: %lf\n",is->audio_clk.pts,is->video_clk.pts);
     //printf("audio clock: %lf,video clock: %lf\n",get_clock(&is->audio_clk),get_clock(&is->video_clk));
-    //printf("video pts: %lf,lu: %lf,curtime: %lf\n ",is->video_clk.pts,is->video_clk.last_updated,av_gettime_relative() / 1000000.0);
-    //printf("audio pts: %lf,lu: %lf,curtime: %lf\n ",is->audio_clk.pts,is->audio_clk.last_updated,av_gettime_relative() / 1000000.0);
+    //printf("video pts: %lf,lu: %lf,curtime: %lf\n ",is->video_clk.pts,is->video_clk.last_updated,AvUtilLibInfo.av_gettime_relative() / 1000000.0);
+    //printf("audio pts: %lf,lu: %lf,curtime: %lf\n ",is->audio_clk.pts,is->audio_clk.last_updated,AvUtilLibInfo.av_gettime_relative() / 1000000.0);
     //printf("video diff audio time: %lf\n",diff);
     // delay是上一帧播放时长：当前帧(待播放的帧)播放时间与上一帧播放时间差理论值
     // diff是视频时钟与同步时钟的差值
@@ -285,7 +285,7 @@ static void video_display(player_stat_t *is)
     // AVFrame.linesize[]: 每个数组元素表示对应plane中一行图像所占的字节数
     if (is->decode_type == SOFT_DECODING)
     {
-        sws_scale(is->img_convert_ctx,                    // sws context
+        SwsLibInfo.sws_scale(is->img_convert_ctx,                    // sws context
                   (const uint8_t *const *)vp->frame->data,// src slice
                   vp->frame->linesize,                    // src stride
                   0,                                      // src slice y
@@ -342,7 +342,7 @@ retry:
     // lastvp和vp不是同一播放序列(一个seek会开始一个新播放序列)，将frame_timer更新为当前时间
     //if (first_frame)
     //{
-    //    is->frame_timer = av_gettime_relative() / 1000000.0;
+    //    is->frame_timer = AvUtilLibInfo.av_gettime_relative() / 1000000.0;
     //    first_frame = false;
     //}
 
@@ -350,7 +350,7 @@ retry:
     last_duration = vp_duration(is, lastvp, vp);        // 上一帧播放时长：vp->pts - lastvp->pts
     delay = compute_target_delay(last_duration, is);    // 根据视频时钟和同步时钟的差值，计算delay值
     //printf("last_duration: %d,delay: %d\n",last_duration,delay);
-    time= av_gettime_relative()/1000000.0;
+    time= AvUtilLibInfo.av_gettime_relative()/1000000.0;
     // 当前帧播放时刻(is->frame_timer+delay)大于当前时刻(time)，表示播放时刻未到
     if (time < is->frame_timer + delay) {
         // 播放时刻未到，则更新刷新时间remaining_time为当前时刻到下一播放时刻的时间差
@@ -381,7 +381,7 @@ retry:
     if (is->playerController.fpGetCurrentPlayPosFromVideo)
     {
         long long videoPts = (long long)(is->video_clk.pts * 1000000LL) - is->p_fmt_ctx->start_time;
-        AVRational frame_rate = av_guess_frame_rate(is->p_fmt_ctx, is->p_video_stream, NULL);
+        AVRational frame_rate = AvFormatLibInfo.av_guess_frame_rate(is->p_fmt_ctx, is->p_video_stream, NULL);
         long long frame_duration = 1000000 / frame_rate.num * frame_rate.den;
         //printf("video pts: %f, drift_pts: %f, duration: %lld, frame_duration:%lld\n", is->video_clk.pts, is->video_clk.pts_drift,
         //  is->p_fmt_ctx->duration, frame_duration);
@@ -439,7 +439,7 @@ static int video_refresh_async(void *opaque, double *remaining_time, AVPacket *p
 
     // 音画同步处理
     delay = compute_target_delay(duration, is);
-    time = av_gettime_relative() / 1000000.0 + duration;
+    time = AvUtilLibInfo.av_gettime_relative() / 1000000.0 + duration;
     //printf("real time : %0.3lf, frame_timer : %.3lf, video with audio delay time : %.3lf\n", time, is->frame_timer, delay);
     if (!isnan(delay))
     {
@@ -472,8 +472,8 @@ static int video_refresh_async(void *opaque, double *remaining_time, AVPacket *p
     if (packet->data == v_flush_pkt.data)
     {
         // 复位解码器内部状态/刷新内部缓冲区。
-        avcodec_flush_buffers(is->p_vcodec_ctx);
-        printf("avcodec_flush_buffers for video!\n");
+        AvCodecLibInfo.avcodec_flush_buffers(is->p_vcodec_ctx);
+        printf("AvCodecLibInfo.avcodec_flush_buffers for video!\n");
     }
     else
     {
@@ -488,29 +488,29 @@ static int video_refresh_async(void *opaque, double *remaining_time, AVPacket *p
             is->p_vcodec_ctx->flags &= ~(1 << 5);
         }
 
-        ret = avcodec_send_packet(is->p_vcodec_ctx, packet);
+        ret = AvCodecLibInfo.avcodec_send_packet(is->p_vcodec_ctx, packet);
         if (ret == AVERROR(EAGAIN))
         {
-            av_log(NULL, AV_LOG_ERROR, "receive_frame and send_packet both returned EAGAIN, which is an API violation.\n");
+            AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR, "receive_frame and send_packet both returned EAGAIN, which is an API violation.\n");
         }
-        av_packet_unref(packet);
+        AvCodecLibInfo.av_packet_unref(packet);
 
-        ret = avcodec_receive_frame(is->p_vcodec_ctx, frame);
+        ret = AvCodecLibInfo.avcodec_receive_frame(is->p_vcodec_ctx, frame);
         if (ret < 0)
         {
             if (ret == AVERROR_EOF)
             {
-                av_log(NULL, AV_LOG_INFO, "video decoder has been fully flushed\n");
-                avcodec_flush_buffers(is->p_vcodec_ctx);
+                AvUtilLibInfo.av_log(NULL, AV_LOG_INFO, "video decoder has been fully flushed\n");
+                AvCodecLibInfo.avcodec_flush_buffers(is->p_vcodec_ctx);
             }
             else
             {
-                //av_log(NULL, AV_LOG_ERROR, "ravcodec_receive_frame failed!\n");
+                //AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR, "ravcodec_receive_frame failed!\n");
                 *remaining_time = REFRESH_RATE;
                 counter ++;
                 if (counter > 300)
                 {
-                    av_log(NULL, AV_LOG_ERROR, "can't get a frame from vdec for long time!\n");
+                    AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR, "can't get a frame from vdec for long time!\n");
                     is->play_error = -4;
                 }
             }
@@ -543,7 +543,7 @@ static int video_refresh_async(void *opaque, double *remaining_time, AVPacket *p
                 // send data to disp
                 if (is->decode_type == SOFT_DECODING)
                 {
-                    sws_scale(is->img_convert_ctx,                    // sws context
+                    SwsLibInfo.sws_scale(is->img_convert_ctx,                    // sws context
                               (const uint8_t *const *)frame->data,    // src slice
                               frame->linesize,                        // src stride
                               0,                                      // src slice y
@@ -564,7 +564,7 @@ static int video_refresh_async(void *opaque, double *remaining_time, AVPacket *p
                     is->playerController.fpDisplayVideo(frame->width, frame->height, frame_ydata, frame_uvdata);
                 }
             }
-            av_frame_unref(frame);
+            AvUtilLibInfo.av_frame_unref(frame);
         }
     }
     if (is->step && !is->paused)
@@ -578,15 +578,15 @@ static int video_refresh_async(void *opaque, double *remaining_time, AVPacket *p
 static void* video_playing_thread(void *arg)
 {
     player_stat_t *is = (player_stat_t *)arg;
-    AVFrame *p_frame = av_frame_alloc();
+    AVFrame *p_frame = AvUtilLibInfo.av_frame_alloc();
     AVPacket pkt;
-    AVRational frame_rate = av_guess_frame_rate(is->p_fmt_ctx, is->p_video_stream, NULL);
+    AVRational frame_rate = AvFormatLibInfo.av_guess_frame_rate(is->p_fmt_ctx, is->p_video_stream, NULL);
     double remaining_time = 0.0;
     double duration = av_q2d((AVRational){frame_rate.den, frame_rate.num});
     printf("video image rate time: %.3lf\n", duration);
 
     printf("video_playing_thread in\n");
-    is->frame_timer = av_gettime_relative() / 1000000.0;
+    is->frame_timer = AvUtilLibInfo.av_gettime_relative() / 1000000.0;
 
     while (1)
     {
@@ -597,7 +597,7 @@ static void* video_playing_thread(void *arg)
         }
         if (remaining_time > 0.0)
         {
-            av_usleep((unsigned)(remaining_time * 1000000.0));
+            AvUtilLibInfo.av_usleep((unsigned)(remaining_time * 1000000.0));
         }
         remaining_time = REFRESH_RATE;
         // 立即显示当前帧，或延时remaining_time后再显示
@@ -609,7 +609,7 @@ static void* video_playing_thread(void *arg)
         #endif
     }
 
-    av_frame_free(&p_frame);
+    AvUtilLibInfo.av_frame_free(&p_frame);
 
     return NULL;
 }
@@ -624,21 +624,21 @@ static int open_video_playing(void *arg)
     AVPixFmtDescriptor *desc;
     
     // 为AVFrame.*data[]手工分配缓冲区，用于存储sws_scale()中目的帧视频数据
-    buf_size = av_image_get_buffer_size(AV_PIX_FMT_NV12,
+    buf_size = AvUtilLibInfo.av_image_get_buffer_size(AV_PIX_FMT_NV12,
                                         is->p_vcodec_ctx->width,
                                         is->p_vcodec_ctx->height,
                                         1
                                         );
     //printf("alloc size: %d,width: %d,height: %d\n",buf_size,is->p_vcodec_ctx->width,is->p_vcodec_ctx->height);
     // buffer将作为p_frm_yuv的视频数据缓冲区
-    buffer = (uint8_t *)av_malloc(buf_size);
+    buffer = (uint8_t *)AvUtilLibInfo.av_malloc(buf_size);
     if (buffer == NULL)
     {
-        printf("av_malloc() for buffer failed\n");
+        printf("AvUtilLibInfo.av_malloc() for buffer failed\n");
         return -1;
     }
     // 使用给定参数设定p_frm_yuv->data和p_frm_yuv->linesize
-    ret = av_image_fill_arrays(is->p_frm_yuv->data,     // dst data[]
+    ret = AvUtilLibInfo.av_image_fill_arrays(is->p_frm_yuv->data,     // dst data[]
                                is->p_frm_yuv->linesize, // dst linesize[]
                                buffer,                  // src buffer
                                AV_PIX_FMT_NV12,         // pixel format
@@ -648,7 +648,7 @@ static int open_video_playing(void *arg)
                                );
     if (ret < 0)
     {
-        printf("av_image_fill_arrays() failed %d\n", ret);
+        printf("AvUtilLibInfo.av_image_fill_arrays() failed %d\n", ret);
         return -1;;
     }
 
@@ -658,10 +658,10 @@ static int open_video_playing(void *arg)
     //     如果解码后得到图像的不被SDL支持，不进行图像转换的话，SDL是无法正常显示图像的
     //     如果解码后得到图像的能被SDL支持，则不必进行图像转换
     //     这里为了编码简便，统一转换为SDL支持的格式AV_PIX_FMT_YUV420P==>SDL_PIXELFORMAT_IYUV
-    desc = (AVPixFmtDescriptor*)av_pix_fmt_desc_get(is->p_vcodec_ctx->pix_fmt);
+    desc = (AVPixFmtDescriptor*)AvUtilLibInfo.av_pix_fmt_desc_get(is->p_vcodec_ctx->pix_fmt);
     printf("video prefix format : %s.\n", desc->name);
 
-    is->img_convert_ctx = sws_getContext(is->p_vcodec_ctx->width,   // src width
+    is->img_convert_ctx = SwsLibInfo.sws_getContext(is->p_vcodec_ctx->width,   // src width
                                          is->p_vcodec_ctx->height,  // src height
                                          is->p_vcodec_ctx->pix_fmt, // src format
                                          is->p_vcodec_ctx->width,   // dst width
@@ -674,7 +674,7 @@ static int open_video_playing(void *arg)
                                          );
     if (is->img_convert_ctx == NULL)
     {
-        printf("sws_getContext() failed\n");
+        printf("SwsLibInfo.sws_getContext() failed\n");
         return -1;
     }
 
@@ -700,17 +700,17 @@ static int open_video_stream(player_stat_t *is)
     switch (p_codec_par->codec_id) 
     {
         case AV_CODEC_ID_H264 :
-            p_codec = avcodec_find_decoder_by_name("ssh264"); 
+            p_codec = AvCodecLibInfo.avcodec_find_decoder_by_name("ssh264"); 
             is->decode_type = HARD_DECODING;
             break;
 
         case AV_CODEC_ID_HEVC :
-            p_codec = avcodec_find_decoder_by_name("sshevc"); 
+            p_codec = AvCodecLibInfo.avcodec_find_decoder_by_name("sshevc"); 
             is->decode_type = HARD_DECODING;
             break;
 
         default :
-            p_codec = avcodec_find_decoder(p_codec_par->codec_id);
+            p_codec = AvCodecLibInfo.avcodec_find_decoder(p_codec_par->codec_id);
             is->decode_type = SOFT_DECODING;
             break;
     }  
@@ -723,10 +723,10 @@ static int open_video_stream(player_stat_t *is)
 
     // 1.3 构建解码器AVCodecContext
     // 1.3.1 p_codec_ctx初始化：分配结构体，使用p_codec初始化相应成员为默认值
-    p_codec_ctx = avcodec_alloc_context3(p_codec);
+    p_codec_ctx = AvCodecLibInfo.avcodec_alloc_context3(p_codec);
     if (p_codec_ctx == NULL)
     {
-        printf("avcodec_alloc_context3() failed\n");
+        printf("AvCodecLibInfo.avcodec_alloc_context3() failed\n");
         return -1;
     }
     // 硬解时选择VDEC缩小画面,传入宽高,由于VDEC只能缩小这里对宽高进行判断
@@ -735,14 +735,14 @@ static int open_video_stream(player_stat_t *is)
     p_codec_ctx->flags  = (p_codec_ctx->flags  > p_codec_par->width ) ? ALIGN_BACK(p_codec_par->width , 32) : p_codec_ctx->flags;
     p_codec_ctx->flags2 = (p_codec_ctx->flags2 > p_codec_par->height) ? ALIGN_BACK(p_codec_par->height, 32) : p_codec_ctx->flags2;
     // 1.3.2 p_codec_ctx初始化：p_codec_par ==> p_codec_ctx，初始化相应成员
-    ret = avcodec_parameters_to_context(p_codec_ctx, p_codec_par);
+    ret = AvCodecLibInfo.avcodec_parameters_to_context(p_codec_ctx, p_codec_par);
     if (ret < 0)
     {
         printf("avcodec_parameters_to_context() failed\n");
         return -1;
     }
     // 1.3.3 p_codec_ctx初始化：使用p_codec初始化p_codec_ctx，初始化完成
-    ret = avcodec_open2(p_codec_ctx, p_codec, NULL);
+    ret = AvCodecLibInfo.avcodec_open2(p_codec_ctx, p_codec, NULL);
     if (ret < 0)
     {
         printf("avcodec_open2() failed %d\n", ret);

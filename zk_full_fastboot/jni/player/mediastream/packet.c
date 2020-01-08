@@ -18,7 +18,7 @@ int packet_queue_put(packet_queue_t *q, AVPacket *pkt)
 {
     AVPacketList *pkt_list;
     
-    if (av_packet_make_refcounted(pkt) < 0)
+    if (AvCodecLibInfo.av_packet_make_refcounted(pkt) < 0)
     {
         printf("[pkt] is not refrence counted\n");
         return -1;
@@ -26,7 +26,7 @@ int packet_queue_put(packet_queue_t *q, AVPacket *pkt)
     
     pthread_mutex_lock(&q->mutex);
     
-    pkt_list = (AVPacketList *)av_malloc(sizeof(AVPacketList));
+    pkt_list = (AVPacketList *)AvUtilLibInfo.av_malloc(sizeof(AVPacketList));
     
     if (!pkt_list)
     {
@@ -88,7 +88,7 @@ int packet_queue_get(packet_queue_t *q, AVPacket *pkt, int block)
             q->nb_packets--;
             q->size -= p_pkt_node->pkt.size + sizeof(*p_pkt_node);
             *pkt = p_pkt_node->pkt;
-            av_free(p_pkt_node);
+            AvUtilLibInfo.av_free(p_pkt_node);
 #if 0
             if(pkt->stream_index == 0)
                 printf("get video pkt queue nb: %d\n",q->nb_packets);
@@ -116,7 +116,7 @@ int packet_queue_get(packet_queue_t *q, AVPacket *pkt, int block)
 int packet_queue_put_nullpacket(packet_queue_t *q, int stream_index)
 {
     AVPacket pkt1, *pkt = &pkt1;
-    av_init_packet(pkt);
+    AvCodecLibInfo.av_init_packet(pkt);
     pkt->data = NULL;
     pkt->size = 0;
     pkt->stream_index = stream_index;
@@ -130,8 +130,8 @@ void packet_queue_flush(packet_queue_t *q)
     pthread_mutex_lock(&q->mutex);
     for (pkt = q->first_pkt; pkt; pkt = pkt1) {
         pkt1 = pkt->next;
-        av_packet_unref(&pkt->pkt);
-        av_freep(&pkt);
+        AvCodecLibInfo.av_packet_unref(&pkt->pkt);
+        AvUtilLibInfo.av_freep(&pkt);
     }
     q->last_pkt = NULL;
     q->first_pkt = NULL;

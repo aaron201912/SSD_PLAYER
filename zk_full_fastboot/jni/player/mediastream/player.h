@@ -37,6 +37,100 @@ extern "C" {               // 告诉编译器下列代码要以C链接约定的�
         return FAIL;\
     }\
 
+typedef struct AvCodec_LibInfo_s
+{
+    void *pAvCodecLibHandle;
+    AVCodecContext *(*avcodec_alloc_context3)(const AVCodec *codec);
+    AVCodec *(*avcodec_find_decoder_by_name)(const char *name);
+    AVCodec *(*avcodec_find_decoder)(enum AVCodecID id);
+    void (*avcodec_flush_buffers)(AVCodecContext *avctx);
+    void (*avcodec_free_context)(AVCodecContext **avctx);
+    int (*avcodec_open2)(AVCodecContext *avctx, const AVCodec *codec, AVDictionary **options);
+    int (*avcodec_parameters_to_context)(AVCodecContext *codec, const AVCodecParameters *par);
+    int (*avcodec_receive_frame)(AVCodecContext *avctx, AVFrame *frame);
+    int (*avcodec_send_packet)(AVCodecContext *avctx, const AVPacket *avpkt);
+    void (*av_init_packet)(AVPacket *pkt);
+    int (*av_packet_make_refcounted)(AVPacket *pkt);
+    void (*av_packet_unref)(AVPacket *pkt);
+} AvCodec_LibInfo_t;
+
+typedef struct AvFormat_LibInfo_s
+{
+    void *pAvFormatLibHandle;
+    AVFormatContext *(*avformat_alloc_context)(void);
+    void (*avformat_close_input)(AVFormatContext **s);
+    int (*avformat_find_stream_info)(AVFormatContext *ic, AVDictionary **options);
+    int (*avformat_open_input)(AVFormatContext **ps, const char *url, AVInputFormat *fmt, AVDictionary **options);
+    int (*avformat_seek_file)(AVFormatContext *s, int stream_index, int64_t min_ts, int64_t ts, int64_t max_ts, int flags);
+    AVRational (*av_guess_frame_rate)(AVFormatContext *ctx, AVStream *stream, AVFrame *frame);
+    int (*avio_feof)(AVIOContext *s);
+    int (*av_read_frame)(AVFormatContext *s, AVPacket *pkt);
+    int (*av_read_pause)(AVFormatContext *s);
+    int (*av_read_play)(AVFormatContext *s);
+} AvFormat_LibInfo_t;
+
+typedef struct AvUtil_LibInfo_s
+{
+    void *pAvUtilLibHandle;
+    void (*av_fast_mallocz)(void *ptr, unsigned int *size, size_t min_size);
+    AVFrame *(*av_frame_alloc)(void);
+    void (*av_frame_free)(AVFrame **frame);
+    void (*av_frame_move_ref)(AVFrame *dst, AVFrame *src);
+    void (*av_frame_unref)(AVFrame *frame);
+    void (*av_free)(void *ptr);
+    void (*av_freep)(void *ptr);
+    int (*av_get_bytes_per_sample)(enum AVSampleFormat sample_fmt);
+    int (*av_get_channel_layout_nb_channels)(uint64_t channel_layout);
+    int64_t (*av_get_default_channel_layout)(int nb_channels);
+    const char *(*av_get_sample_fmt_name)(enum AVSampleFormat sample_fmt);
+    int64_t (*av_gettime_relative)(void);
+    int (*av_image_fill_arrays)(uint8_t *dst_data[4], int dst_linesize[4], const uint8_t *src, enum AVPixelFormat pix_fmt, int width, int height, int align);
+    int (*av_image_get_buffer_size)(enum AVPixelFormat pix_fmt, int width, int height, int align);
+    void (*av_log)(void *avcl, int level, const char *fmt, ...) av_printf_format(3, 4);
+    void *(*av_malloc)(size_t size) av_malloc_attrib av_alloc_size(1);
+    void *(*av_mallocz)(size_t size) av_malloc_attrib av_alloc_size(1);
+    const AVPixFmtDescriptor *(*av_pix_fmt_desc_get)(enum AVPixelFormat pix_fmt);
+    int64_t (*av_rescale_q)(int64_t a, AVRational bq, AVRational cq) av_const;
+    int (*av_samples_get_buffer_size)(int *linesize, int nb_channels, int nb_samples,enum AVSampleFormat sample_fmt, int align);
+    char *(*av_strdup)(const char *s) av_malloc_attrib;
+    int (*av_usleep)(unsigned usec);
+} AvUtil_LibInfo_t;
+
+typedef struct Swr_LibInfo_s
+{
+    void *pSwrLibHandle;
+    struct SwrContext *(*swr_alloc_set_opts)(struct SwrContext *s, \
+                                          int64_t out_ch_layout, enum AVSampleFormat out_sample_fmt, int out_sample_rate, \
+                                          int64_t  in_ch_layout, enum AVSampleFormat  in_sample_fmt, int  in_sample_rate, \
+                                          int log_offset, void *log_ctx);
+    int (*swr_convert)(struct SwrContext *s, uint8_t **out, int out_count,const uint8_t **in , int in_count);
+    void (*swr_free)(struct SwrContext **s);
+    int (*swr_init)(struct SwrContext *s);
+    
+
+} Swr_LibInfo_t;
+
+typedef struct Sws_LibInfo_s
+{
+    void *pSwsLibHandle;
+    void (*sws_freeContext)(struct SwsContext *swsContext);
+    struct SwsContext *(*sws_getContext)(int srcW, int srcH, enum AVPixelFormat srcFormat, \
+                                  int dstW, int dstH, enum AVPixelFormat dstFormat, \
+                                  int flags, SwsFilter *srcFilter, \
+                                  SwsFilter *dstFilter, const double *param);
+    int (*sws_scale)(struct SwsContext *c, const uint8_t *const srcSlice[], \
+              const int srcStride[], int srcSliceY, int srcSliceH, \
+              uint8_t *const dst[], const int dstStride[]);
+                 
+
+} Sws_LibInfo_t;
+
+//ffmpeg lib
+extern AvCodec_LibInfo_t AvCodecLibInfo;
+extern AvFormat_LibInfo_t AvFormatLibInfo;
+extern AvUtil_LibInfo_t AvUtilLibInfo;
+extern Swr_LibInfo_t SwrLibInfo;
+extern Sws_LibInfo_t SwsLibInfo;
 
 /* no AV sync correction is done if below the minimum AV sync threshold */
 #define AV_SYNC_THRESHOLD_MIN 0.04

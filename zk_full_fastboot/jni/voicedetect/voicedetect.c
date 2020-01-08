@@ -9,6 +9,8 @@
 #include <sys/syscall.h>
 #include <sys/time.h>
 #include <pthread.h>
+#include <dlfcn.h>
+
 #include "mi_sys.h"
 #include "mi_ai.h"
 #include "list.h"
@@ -161,6 +163,8 @@ static pthread_mutex_t g_frameMutex;
 static ThreadData_t g_stRecogThreadData;
 static ThreadData_t g_stAudioInThreadData;
 static UsrData_t g_stUsrData;
+
+static DSpotter_LibInfo_t stDSpotterLibInfo;
 
 // print comman list
 void PrintCommanList()
@@ -613,6 +617,66 @@ int SSTAR_VoiceDetectGetWordList(TrainedWord_t *pWordList, int nWordCnt)
 	return nCount;
 }
 
+bool CloseDSpotterLib(void)
+{
+    printf("CloseDSpotterLib\n");
+    if(stDSpotterLibInfo.pDSpotterLibHandle)
+    {
+        dlclose(stDSpotterLibInfo.pDSpotterLibHandle);
+        stDSpotterLibInfo.pDSpotterLibHandle = NULL;
+    }
+    memset(&stDSpotterLibInfo, 0, sizeof(stDSpotterLibInfo));
+    
+    return 0;
+}
+
+bool OpenDSpotterLib(void)
+{
+    printf("OpenDSpotterLib\n");
+    stDSpotterLibInfo.pDSpotterLibHandle = dlopen("libDSpotter.so", RTLD_NOW);
+    if(NULL == stDSpotterLibInfo.pDSpotterLibHandle)
+    {
+        printf(" %s: Can not load libDSpotter.so!\n", __func__);
+        return FALSE;
+    }
+
+    stDSpotterLibInfo.DSpotterInitMultiWithMod = (DSPDLL_API HANDLE(*)(char *lpchCYBaseFile, char *lppchGroupFile[], INT nNumGroupFile, INT nMaxTime, BYTE *lpbyState, INT nStateSize, INT *lpnErr, char *lpchLicenseFile))dlsym(stDSpotterLibInfo.pDSpotterLibHandle, "DSpotterInitMultiWithMod");
+    if(NULL == stDSpotterLibInfo.DSpotterInitMultiWithMod)
+    {
+        printf(" %s: dlsym DSpotterInitMultiWithMod failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
+
+    stDSpotterLibInfo.DSpotterRelease = (DSPDLL_API INT (*)(HANDLE hDSpotter))dlsym(stDSpotterLibInfo.pDSpotterLibHandle, "DSpotterRelease");
+    if(NULL == stDSpotterLibInfo.DSpotterRelease)
+    {
+        printf(" %s: dlsym DSpotterRelease failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
+
+    stDSpotterLibInfo.DSpotterReset = (DSPDLL_API INT (*)(HANDLE hDSpotter))dlsym(stDSpotterLibInfo.pDSpotterLibHandle, "DSpotterReset");
+    if(NULL == stDSpotterLibInfo.DSpotterReset)
+    {
+        printf(" %s: dlsym DSpotterReset failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
+
+    stDSpotterLibInfo.DSpotterAddSample = (DSPDLL_API INT (*)(HANDLE hDSpotter, SHORT *lpsSample, INT nNumSample))dlsym(stDSpotterLibInfo.pDSpotterLibHandle, "DSpotterAddSample");
+    if(NULL == stDSpotterLibInfo.DSpotterAddSample)
+    {
+        printf(" %s: dlsym DSpotterAddSample failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
+
+    stDSpotterLibInfo.DSpotterGetResult = (DSPDLL_API INT (*)(HANDLE hDSpotter))dlsym(stDSpotterLibInfo.pDSpotterLibHandle, "DSpotterGetResult");
+    if(NULL == stDSpotterLibInfo.DSpotterGetResult)
+    {
+        printf(" %s: dlsym DSpotterGetResult failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
+
+    return 0;
+}
 // get command from commanBin, save command list
 HANDLE SSTAR_VoiceDetectInit()
 {
@@ -623,6 +687,8 @@ HANDLE SSTAR_VoiceDetectInit()
 	char szCommandBinFile[MAX_BUF_LEN];
 	char szLicenseBinFile[MAX_BUF_LEN];
 	char *pModelFile[1];
+	
+	OpenDSpotterLib();
 
 	//InitTrainingWordList(&g_wordListHead);
 	PrintCommanList();
@@ -636,8 +702,8 @@ HANDLE SSTAR_VoiceDetectInit()
     printf("licenseBin path: %s\n", szLicenseBinFile);
 
 	pModelFile[0] = szCommandBinFile;
-
-	hDSpotter = DSpotterInitMultiWithMod(szBaseBinFile, pModelFile, 1, 1000, NULL, 0, &nErr, szLicenseBinFile);
+    
+	hDSpotter = stDSpotterLibInfo.DSpotterInitMultiWithMod(szBaseBinFile, pModelFile, 1, 1000, NULL, 0, &nErr, szLicenseBinFile);
 	if (!hDSpotter)
 	{
 		printf("%s[%d]: failed to initialize DSpotter, nErr=%d\n", __FUNCTION__, __LINE__, nErr);
@@ -649,8 +715,8 @@ HANDLE SSTAR_VoiceDetectInit()
 
 int SSTAR_VoiceDetectDeinit(HANDLE hDSpotter)
 {
-	DSpotterRelease(hDSpotter);
-
+	stDSpotterLibInfo.DSpotterRelease(hDSpotter);
+    CloseDSpotterLib();
 	return 0;
 }
 
@@ -664,7 +730,7 @@ static void *_SSTAR_VoiceAnalyzeProc_(void *pData)
 
     AD_LOG("Enter _SSTAR_VoiceAnalyzeProc_\n");
 
-    if ((s32Ret = DSpotterReset(pUsrData->hDSpotter)) != DSPOTTER_SUCCESS)
+    if ((s32Ret = stDSpotterLibInfo.DSpotterReset(pUsrData->hDSpotter)) != DSPOTTER_SUCCESS)
     {
         printf("DSpotterReset:: Fail to start recognition (%d)\n", s32Ret);
         return NULL;
@@ -682,12 +748,12 @@ static void *_SSTAR_VoiceAnalyzeProc_(void *pData)
             continue;
         }
 
-       s32Ret = DSpotterAddSample(pUsrData->hDSpotter, (short*)pstVoiceFrame->pFrameData, pstVoiceFrame->frameLen/sizeof(short));
+       s32Ret = stDSpotterLibInfo.DSpotterAddSample(pUsrData->hDSpotter, (short*)pstVoiceFrame->pFrameData, pstVoiceFrame->frameLen/sizeof(short));
        if (s32Ret == DSPOTTER_SUCCESS)
        {
             //printf("Get result\n");
 
-            if ((nResultID = DSpotterGetResult(pUsrData->hDSpotter)) >= 0)
+            if ((nResultID = stDSpotterLibInfo.DSpotterGetResult(pUsrData->hDSpotter)) >= 0)
             {
                 printf("Get command: id=%d, %s\n", nResultID, g_command[nResultID].cmd);
 
