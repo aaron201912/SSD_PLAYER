@@ -236,14 +236,19 @@ static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
     frame_t *af = NULL;
     frame_queue_t *f = &is->audio_frm_queue;
 
+replay:
     if (is->paused)
         return -1;
 
+    if (is->seek_flags & (1 << 5))
+    {
+        frame_queue_flush(&is->audio_frm_queue);
+        is->seek_flags &= ~(1 << 5);
+    }
+
     // 若队列头部可读，则由af指向可读帧
-#if 0
-    if (!(af = frame_queue_peek_readable(&is->audio_frm_queue)))
-        return -1;
-#else
+    //if (!(af = frame_queue_peek_readable(&is->audio_frm_queue)))
+    //    return -1;
     pthread_mutex_lock(&f->mutex);
     while (f->size - f->rindex_shown <= 0 && !f->pktq->abort_request) {
         printf("wait for audio frame\n");
@@ -258,14 +263,15 @@ static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
     
     if (f->pktq->abort_request)
         return AVERROR_EOF;
-    
+
     af = &f->queue[(f->rindex + f->rindex_shown) % f->max_size];
-#endif
+
+    frame_queue_next(&is->audio_frm_queue);
 
     if (!af->frame->channel_layout || !af->frame->sample_rate || af->frame->format == -1)
     {
         printf("invalid audio frame layout sample_rate and format!\n");
-        return AVERROR_EXIT;
+        goto replay;
     }
     enum AVSampleFormat sample_fmt = (enum AVSampleFormat)(af->frame->format);
 
@@ -391,8 +397,6 @@ static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
         last_clock = is->audio_clock;
     }
 #endif
-    frame_queue_next(&is->audio_frm_queue);
-
     return resampled_data_size;
 fail:
     av_freep(&is->audio_frm_rwr);
@@ -420,8 +424,6 @@ static void* audio_playing_thread(void *arg)
         audio_size = audio_resample(is, audio_callback_time);
         if (audio_size == AVERROR_EOF)
             break;
-        else if (audio_size == AVERROR_EXIT)
-            continue;
         else if (audio_size < 0)
         {
             /* if error, just output silence */

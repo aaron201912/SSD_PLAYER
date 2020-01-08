@@ -113,7 +113,7 @@ static int demux_init(player_stat_t *is)
     }
 
     // set GetCurPlayPos callback
-    if (is->video_idx >= 0 && is->p_video_stream->codec_info_nb_frames > 1)
+    if (is->video_idx >= 0 && is->p_video_stream->codec_info_nb_frames >= 1)
     {
         is->playerController.fpGetCurrentPlayPosFromVideo = is->playerController.fpGetCurrentPlayPos;
         printf("get play pos from video stream\n");
@@ -137,7 +137,7 @@ static int demux_init(player_stat_t *is)
     }
  
     return 0;
-    
+
 fail:
     if (p_fmt_ctx != NULL)
     {
@@ -247,12 +247,12 @@ static void* demux_thread(void *arg)
                 if (is->audio_idx >= 0) {
                     packet_queue_flush(&is->audio_pkt_queue);
                     packet_queue_put(&is->audio_pkt_queue, &a_flush_pkt);
-                    frame_queue_flush(&is->audio_frm_queue);
+                    is->seek_flags |= (1 << 5);
                 }
                 if (is->video_idx >= 0) {
                     packet_queue_flush(&is->video_pkt_queue);
                     packet_queue_put(&is->video_pkt_queue, &v_flush_pkt);
-                    frame_queue_flush(&is->video_frm_queue);
+                    is->seek_flags |= (1 << 6);
                     is->p_vcodec_ctx->flags |= (1 << 7);
                 }
                 /*

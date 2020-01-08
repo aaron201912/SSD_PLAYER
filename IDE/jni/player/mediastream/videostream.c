@@ -331,6 +331,12 @@ retry:
     if (is->paused)
         return;
 
+    if (is->seek_flags & (1 << 6))
+    {
+        frame_queue_flush(&is->video_frm_queue);
+        is->seek_flags &= ~(1 << 6);
+    }
+
     if (frame_queue_nb_remaining(&is->video_frm_queue) <= 0)  // 所有帧已显示
     {    
         // if file is eof and there is no paket in queue, then do complete
