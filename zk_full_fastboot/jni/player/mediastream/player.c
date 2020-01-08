@@ -293,423 +293,408 @@ bool OpenFFmpegLib(void)
 {
     printf("OpenFFmpegLib\n");
     //open libavcodec
-    if (!AvCodecLibInfo.pAvCodecLibHandle)
+    AvCodecLibInfo.pAvCodecLibHandle = dlopen("libavcodec.so", RTLD_NOW);
+    if(NULL == AvCodecLibInfo.pAvCodecLibHandle)
     {
-		AvCodecLibInfo.pAvCodecLibHandle = dlopen("libavcodec.so", RTLD_NOW);
-		if(NULL == AvCodecLibInfo.pAvCodecLibHandle)
-		{
-			printf(" %s: Can not load libavcodec.so!\n", __func__);
-			return FALSE;
-		}
+        printf(" %s: Can not load libavcodec.so!\n", __func__);
+        return FALSE;
+    }
 
-		AvCodecLibInfo.avcodec_alloc_context3 = (AVCodecContext *(*)(const AVCodec *codec))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "avcodec_alloc_context3");
-		if(NULL == AvCodecLibInfo.avcodec_alloc_context3)
-		{
-			printf(" %s: dlsym avcodec_alloc_context3 failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvCodecLibInfo.avcodec_alloc_context3 = (AVCodecContext *(*)(const AVCodec *codec))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "avcodec_alloc_context3");
+    if(NULL == AvCodecLibInfo.avcodec_alloc_context3)
+    {
+        printf(" %s: dlsym avcodec_alloc_context3 failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvCodecLibInfo.avcodec_find_decoder_by_name = (AVCodec *(*)(const char *name))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "avcodec_find_decoder_by_name");
-		if(NULL == AvCodecLibInfo.avcodec_find_decoder_by_name)
-		{
-			printf(" %s: dlsym avcodec_find_decoder_by_name failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvCodecLibInfo.avcodec_find_decoder_by_name = (AVCodec *(*)(const char *name))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "avcodec_find_decoder_by_name");
+    if(NULL == AvCodecLibInfo.avcodec_find_decoder_by_name)
+    {
+        printf(" %s: dlsym avcodec_find_decoder_by_name failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvCodecLibInfo.avcodec_find_decoder = (AVCodec *(*)(enum AVCodecID id))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "avcodec_find_decoder");
-		if(NULL == AvCodecLibInfo.avcodec_find_decoder)
-		{
-			printf(" %s: dlsym avcodec_find_decoder failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvCodecLibInfo.avcodec_find_decoder = (AVCodec *(*)(enum AVCodecID id))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "avcodec_find_decoder");
+    if(NULL == AvCodecLibInfo.avcodec_find_decoder)
+    {
+        printf(" %s: dlsym avcodec_find_decoder failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvCodecLibInfo.avcodec_flush_buffers = (void (*)(AVCodecContext *avctx))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "avcodec_flush_buffers");
-		if(NULL == AvCodecLibInfo.avcodec_flush_buffers)
-		{
-			printf(" %s: dlsym avcodec_flush_buffers failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvCodecLibInfo.avcodec_flush_buffers = (void (*)(AVCodecContext *avctx))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "avcodec_flush_buffers");
+    if(NULL == AvCodecLibInfo.avcodec_flush_buffers)
+    {
+        printf(" %s: dlsym avcodec_flush_buffers failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvCodecLibInfo.avcodec_free_context = (void (*)(AVCodecContext **avctx))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "avcodec_free_context");
-		if(NULL == AvCodecLibInfo.avcodec_free_context)
-		{
-			printf(" %s: dlsym avcodec_free_context failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvCodecLibInfo.avcodec_free_context = (void (*)(AVCodecContext **avctx))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "avcodec_free_context");
+    if(NULL == AvCodecLibInfo.avcodec_free_context)
+    {
+        printf(" %s: dlsym avcodec_free_context failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvCodecLibInfo.avcodec_open2 = (int (*)(AVCodecContext *avctx, const AVCodec *codec, AVDictionary **options))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "avcodec_open2");
-		if(NULL == AvCodecLibInfo.avcodec_open2)
-		{
-			printf(" %s: dlsym avcodec_open2 failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvCodecLibInfo.avcodec_open2 = (int (*)(AVCodecContext *avctx, const AVCodec *codec, AVDictionary **options))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "avcodec_open2");
+    if(NULL == AvCodecLibInfo.avcodec_open2)
+    {
+        printf(" %s: dlsym avcodec_open2 failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvCodecLibInfo.avcodec_parameters_to_context = (int (*)(AVCodecContext *codec, const AVCodecParameters *par))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "avcodec_parameters_to_context");
-		if(NULL == AvCodecLibInfo.avcodec_parameters_to_context)
-		{
-			printf(" %s: dlsym avcodec_parameters_to_context failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvCodecLibInfo.avcodec_parameters_to_context = (int (*)(AVCodecContext *codec, const AVCodecParameters *par))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "avcodec_parameters_to_context");
+    if(NULL == AvCodecLibInfo.avcodec_parameters_to_context)
+    {
+        printf(" %s: dlsym avcodec_parameters_to_context failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvCodecLibInfo.avcodec_receive_frame = (int (*)(AVCodecContext *avctx, AVFrame *frame))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "avcodec_receive_frame");
-		if(NULL == AvCodecLibInfo.avcodec_receive_frame)
-		{
-			printf(" %s: dlsym avcodec_receive_frame failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvCodecLibInfo.avcodec_receive_frame = (int (*)(AVCodecContext *avctx, AVFrame *frame))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "avcodec_receive_frame");
+    if(NULL == AvCodecLibInfo.avcodec_receive_frame)
+    {
+        printf(" %s: dlsym avcodec_receive_frame failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvCodecLibInfo.avcodec_send_packet = (int (*)(AVCodecContext *avctx, const AVPacket *avpkt))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "avcodec_send_packet");
-		if(NULL == AvCodecLibInfo.avcodec_send_packet)
-		{
-			printf(" %s: dlsym avcodec_send_packet failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvCodecLibInfo.avcodec_send_packet = (int (*)(AVCodecContext *avctx, const AVPacket *avpkt))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "avcodec_send_packet");
+    if(NULL == AvCodecLibInfo.avcodec_send_packet)
+    {
+        printf(" %s: dlsym avcodec_send_packet failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvCodecLibInfo.av_init_packet = (void (*)(AVPacket *pkt))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "av_init_packet");
-		if(NULL == AvCodecLibInfo.av_init_packet)
-		{
-			printf(" %s: dlsym av_init_packet failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvCodecLibInfo.av_init_packet = (void (*)(AVPacket *pkt))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "av_init_packet");
+    if(NULL == AvCodecLibInfo.av_init_packet)
+    {
+        printf(" %s: dlsym av_init_packet failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvCodecLibInfo.av_packet_make_refcounted = (int (*)(AVPacket *pkt))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "av_packet_make_refcounted");
-		if(NULL == AvCodecLibInfo.av_packet_make_refcounted)
-		{
-			printf(" %s: dlsym av_packet_make_refcounted failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvCodecLibInfo.av_packet_make_refcounted = (int (*)(AVPacket *pkt))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "av_packet_make_refcounted");
+    if(NULL == AvCodecLibInfo.av_packet_make_refcounted)
+    {
+        printf(" %s: dlsym av_packet_make_refcounted failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvCodecLibInfo.av_packet_unref = (void (*)(AVPacket *pkt))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "av_packet_unref");
-		if(NULL == AvCodecLibInfo.av_packet_unref)
-		{
-			printf(" %s: dlsym av_packet_unref failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvCodecLibInfo.av_packet_unref = (void (*)(AVPacket *pkt))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "av_packet_unref");
+    if(NULL == AvCodecLibInfo.av_packet_unref)
+    {
+        printf(" %s: dlsym av_packet_unref failed, %s\n", __func__, dlerror());
+        return FALSE;
     }
 
     //open libavformat
-    if (!AvFormatLibInfo.pAvFormatLibHandle)
+    AvFormatLibInfo.pAvFormatLibHandle = dlopen("libavformat.so", RTLD_NOW);
+    if(NULL == AvFormatLibInfo.pAvFormatLibHandle)
     {
-		AvFormatLibInfo.pAvFormatLibHandle = dlopen("libavformat.so", RTLD_NOW);
-		if(NULL == AvFormatLibInfo.pAvFormatLibHandle)
-		{
-			printf(" %s: Can not load libavformat.so!\n", __func__);
-			return FALSE;
-		}
+        printf(" %s: Can not load libavformat.so!\n", __func__);
+        return FALSE;
+    }
 
-		AvFormatLibInfo.avformat_alloc_context = (AVFormatContext *(*)(void))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "avformat_alloc_context");
-		if(NULL == AvFormatLibInfo.avformat_alloc_context)
-		{
-			printf(" %s: dlsym avformat_alloc_context failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvFormatLibInfo.avformat_alloc_context = (AVFormatContext *(*)(void))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "avformat_alloc_context");
+    if(NULL == AvFormatLibInfo.avformat_alloc_context)
+    {
+        printf(" %s: dlsym avformat_alloc_context failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvFormatLibInfo.avformat_close_input = (void (*)(AVFormatContext **s))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "avformat_close_input");
-		if(NULL == AvFormatLibInfo.avformat_close_input)
-		{
-			printf(" %s: dlsym avformat_close_input failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvFormatLibInfo.avformat_close_input = (void (*)(AVFormatContext **s))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "avformat_close_input");
+    if(NULL == AvFormatLibInfo.avformat_close_input)
+    {
+        printf(" %s: dlsym avformat_close_input failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvFormatLibInfo.avformat_find_stream_info = (int (*)(AVFormatContext *ic, AVDictionary **options))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "avformat_find_stream_info");
-		if(NULL == AvFormatLibInfo.avformat_find_stream_info)
-		{
-			printf(" %s: dlsym avformat_find_stream_info failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvFormatLibInfo.avformat_find_stream_info = (int (*)(AVFormatContext *ic, AVDictionary **options))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "avformat_find_stream_info");
+    if(NULL == AvFormatLibInfo.avformat_find_stream_info)
+    {
+        printf(" %s: dlsym avformat_find_stream_info failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvFormatLibInfo.avformat_open_input = (int (*)(AVFormatContext **ps, const char *url, AVInputFormat *fmt, AVDictionary **options))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "avformat_open_input");
-		if(NULL == AvFormatLibInfo.avformat_open_input)
-		{
-			printf(" %s: dlsym avformat_open_input failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvFormatLibInfo.avformat_open_input = (int (*)(AVFormatContext **ps, const char *url, AVInputFormat *fmt, AVDictionary **options))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "avformat_open_input");
+    if(NULL == AvFormatLibInfo.avformat_open_input)
+    {
+        printf(" %s: dlsym avformat_open_input failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvFormatLibInfo.avformat_seek_file = (int (*)(AVFormatContext *s, int stream_index, int64_t min_ts, int64_t ts, int64_t max_ts, int flags))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "avformat_seek_file");
-		if(NULL == AvFormatLibInfo.avformat_seek_file)
-		{
-			printf(" %s: dlsym avformat_seek_file failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvFormatLibInfo.avformat_seek_file = (int (*)(AVFormatContext *s, int stream_index, int64_t min_ts, int64_t ts, int64_t max_ts, int flags))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "avformat_seek_file");
+    if(NULL == AvFormatLibInfo.avformat_seek_file)
+    {
+        printf(" %s: dlsym avformat_seek_file failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvFormatLibInfo.av_guess_frame_rate = (AVRational (*)(AVFormatContext *ctx, AVStream *stream, AVFrame *frame))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "av_guess_frame_rate");
-		if(NULL == AvFormatLibInfo.av_guess_frame_rate)
-		{
-			printf(" %s: dlsym av_guess_frame_rate failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvFormatLibInfo.av_guess_frame_rate = (AVRational (*)(AVFormatContext *ctx, AVStream *stream, AVFrame *frame))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "av_guess_frame_rate");
+    if(NULL == AvFormatLibInfo.av_guess_frame_rate)
+    {
+        printf(" %s: dlsym av_guess_frame_rate failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvFormatLibInfo.avio_feof = (int (*)(AVIOContext *s))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "avio_feof");
-		if(NULL == AvFormatLibInfo.avio_feof)
-		{
-			printf(" %s: dlsym avio_feof failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvFormatLibInfo.avio_feof = (int (*)(AVIOContext *s))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "avio_feof");
+    if(NULL == AvFormatLibInfo.avio_feof)
+    {
+        printf(" %s: dlsym avio_feof failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvFormatLibInfo.av_read_frame = (int (*)(AVFormatContext *s, AVPacket *pkt))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "av_read_frame");
-		if(NULL == AvFormatLibInfo.av_read_frame)
-		{
-			printf(" %s: dlsym av_read_frame failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvFormatLibInfo.av_read_frame = (int (*)(AVFormatContext *s, AVPacket *pkt))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "av_read_frame");
+    if(NULL == AvFormatLibInfo.av_read_frame)
+    {
+        printf(" %s: dlsym av_read_frame failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvFormatLibInfo.av_read_pause = (int (*)(AVFormatContext *s))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "av_read_pause");
-		if(NULL == AvFormatLibInfo.av_read_pause)
-		{
-			printf(" %s: dlsym av_read_pause failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvFormatLibInfo.av_read_pause = (int (*)(AVFormatContext *s))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "av_read_pause");
+    if(NULL == AvFormatLibInfo.av_read_pause)
+    {
+        printf(" %s: dlsym av_read_pause failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvFormatLibInfo.av_read_play = (int (*)(AVFormatContext *s))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "av_read_play");
-		if(NULL == AvFormatLibInfo.av_read_play)
-		{
-			printf(" %s: dlsym av_read_play failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvFormatLibInfo.av_read_play = (int (*)(AVFormatContext *s))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "av_read_play");
+    if(NULL == AvFormatLibInfo.av_read_play)
+    {
+        printf(" %s: dlsym av_read_play failed, %s\n", __func__, dlerror());
+        return FALSE;
     }
 
     //open libavutil.so
-    if (!AvUtilLibInfo.pAvUtilLibHandle)
+    AvUtilLibInfo.pAvUtilLibHandle = dlopen("libavutil.so", RTLD_NOW);
+    if(NULL == AvUtilLibInfo.pAvUtilLibHandle)
     {
-		AvUtilLibInfo.pAvUtilLibHandle = dlopen("libavutil.so", RTLD_NOW);
-		if(NULL == AvUtilLibInfo.pAvUtilLibHandle)
-		{
-			printf(" %s: Can not load libavutil.so!\n", __func__);
-			return FALSE;
-		}
+        printf(" %s: Can not load libavutil.so!\n", __func__);
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_fast_mallocz = (void (*)(void *ptr, unsigned int *size, size_t min_size))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_fast_mallocz");
-		if(NULL == AvUtilLibInfo.av_fast_mallocz)
-		{
-			printf(" %s: dlsym av_fast_mallocz failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_fast_mallocz = (void (*)(void *ptr, unsigned int *size, size_t min_size))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_fast_mallocz");
+    if(NULL == AvUtilLibInfo.av_fast_mallocz)
+    {
+        printf(" %s: dlsym av_fast_mallocz failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_frame_alloc = (AVFrame *(*)(void))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_frame_alloc");
-		if(NULL == AvUtilLibInfo.av_frame_alloc)
-		{
-			printf(" %s: dlsym av_frame_alloc failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_frame_alloc = (AVFrame *(*)(void))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_frame_alloc");
+    if(NULL == AvUtilLibInfo.av_frame_alloc)
+    {
+        printf(" %s: dlsym av_frame_alloc failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_frame_free = (void (*)(AVFrame **frame))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_frame_free");
-		if(NULL == AvUtilLibInfo.av_frame_free)
-		{
-			printf(" %s: dlsym av_frame_free failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_frame_free = (void (*)(AVFrame **frame))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_frame_free");
+    if(NULL == AvUtilLibInfo.av_frame_free)
+    {
+        printf(" %s: dlsym av_frame_free failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_frame_move_ref = (void (*)(AVFrame *dst, AVFrame *src))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_frame_move_ref");
-		if(NULL == AvUtilLibInfo.av_frame_move_ref)
-		{
-			printf(" %s: dlsym av_frame_move_ref failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_frame_move_ref = (void (*)(AVFrame *dst, AVFrame *src))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_frame_move_ref");
+    if(NULL == AvUtilLibInfo.av_frame_move_ref)
+    {
+        printf(" %s: dlsym av_frame_move_ref failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_frame_unref = (void (*)(AVFrame *frame))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_frame_unref");
-		if(NULL == AvUtilLibInfo.av_frame_unref)
-		{
-			printf(" %s: dlsym av_frame_unref failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_frame_unref = (void (*)(AVFrame *frame))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_frame_unref");
+    if(NULL == AvUtilLibInfo.av_frame_unref)
+    {
+        printf(" %s: dlsym av_frame_unref failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_free = (void (*)(void *ptr))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_free");
-		if(NULL == AvUtilLibInfo.av_free)
-		{
-			printf(" %s: dlsym av_free failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_free = (void (*)(void *ptr))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_free");
+    if(NULL == AvUtilLibInfo.av_free)
+    {
+        printf(" %s: dlsym av_free failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_freep = (void (*)(void *ptr))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_freep");
-		if(NULL == AvUtilLibInfo.av_freep)
-		{
-			printf(" %s: dlsym av_freep failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_freep = (void (*)(void *ptr))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_freep");
+    if(NULL == AvUtilLibInfo.av_freep)
+    {
+        printf(" %s: dlsym av_freep failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_get_bytes_per_sample = (int (*)(enum AVSampleFormat sample_fmt))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_get_bytes_per_sample");
-		if(NULL == AvUtilLibInfo.av_get_bytes_per_sample)
-		{
-			printf(" %s: dlsym av_get_bytes_per_sample failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_get_bytes_per_sample = (int (*)(enum AVSampleFormat sample_fmt))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_get_bytes_per_sample");
+    if(NULL == AvUtilLibInfo.av_get_bytes_per_sample)
+    {
+        printf(" %s: dlsym av_get_bytes_per_sample failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_get_channel_layout_nb_channels = (int (*)(uint64_t channel_layout))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_get_channel_layout_nb_channels");
-		if(NULL == AvUtilLibInfo.av_get_channel_layout_nb_channels)
-		{
-			printf(" %s: dlsym av_get_channel_layout_nb_channels failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_get_channel_layout_nb_channels = (int (*)(uint64_t channel_layout))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_get_channel_layout_nb_channels");
+    if(NULL == AvUtilLibInfo.av_get_channel_layout_nb_channels)
+    {
+        printf(" %s: dlsym av_get_channel_layout_nb_channels failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_get_default_channel_layout = (int64_t (*)(int nb_channels))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_get_default_channel_layout");
-		if(NULL == AvUtilLibInfo.av_get_default_channel_layout)
-		{
-			printf(" %s: dlsym av_get_default_channel_layout failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_get_default_channel_layout = (int64_t (*)(int nb_channels))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_get_default_channel_layout");
+    if(NULL == AvUtilLibInfo.av_get_default_channel_layout)
+    {
+        printf(" %s: dlsym av_get_default_channel_layout failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_get_sample_fmt_name = (const char *(*)(enum AVSampleFormat sample_fmt))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_get_sample_fmt_name");
-		if(NULL == AvUtilLibInfo.av_get_sample_fmt_name)
-		{
-			printf(" %s: dlsym av_get_sample_fmt_name failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_get_sample_fmt_name = (const char *(*)(enum AVSampleFormat sample_fmt))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_get_sample_fmt_name");
+    if(NULL == AvUtilLibInfo.av_get_sample_fmt_name)
+    {
+        printf(" %s: dlsym av_get_sample_fmt_name failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_gettime_relative = (int64_t (*)(void))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_gettime_relative");
-		if(NULL == AvUtilLibInfo.av_gettime_relative)
-		{
-			printf(" %s: dlsym av_gettime_relative failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_gettime_relative = (int64_t (*)(void))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_gettime_relative");
+    if(NULL == AvUtilLibInfo.av_gettime_relative)
+    {
+        printf(" %s: dlsym av_gettime_relative failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_image_fill_arrays = (int (*)(uint8_t *dst_data[4], int dst_linesize[4], const uint8_t *src, enum AVPixelFormat pix_fmt, int width, int height, int align))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_image_fill_arrays");
-		if(NULL == AvUtilLibInfo.av_image_fill_arrays)
-		{
-			printf(" %s: dlsym av_image_fill_arrays failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_image_fill_arrays = (int (*)(uint8_t *dst_data[4], int dst_linesize[4], const uint8_t *src, enum AVPixelFormat pix_fmt, int width, int height, int align))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_image_fill_arrays");
+    if(NULL == AvUtilLibInfo.av_image_fill_arrays)
+    {
+        printf(" %s: dlsym av_image_fill_arrays failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_image_get_buffer_size = (int (*)(enum AVPixelFormat pix_fmt, int width, int height, int align))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_image_get_buffer_size");
-		if(NULL == AvUtilLibInfo.av_image_get_buffer_size)
-		{
-			printf(" %s: dlsym av_image_get_buffer_size failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_image_get_buffer_size = (int (*)(enum AVPixelFormat pix_fmt, int width, int height, int align))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_image_get_buffer_size");
+    if(NULL == AvUtilLibInfo.av_image_get_buffer_size)
+    {
+        printf(" %s: dlsym av_image_get_buffer_size failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_log = (void (*)(void *avcl, int level, const char *fmt, ...))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_log");
-		if(NULL == AvUtilLibInfo.av_log)
-		{
-			printf(" %s: dlsym av_log failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_log = (void (*)(void *avcl, int level, const char *fmt, ...))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_log");
+    if(NULL == AvUtilLibInfo.av_log)
+    {
+        printf(" %s: dlsym av_log failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_malloc = (void *(*)(size_t size) )dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_malloc");
-		if(NULL == AvUtilLibInfo.av_malloc)
-		{
-			printf(" %s: dlsym av_malloc failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_malloc = (void *(*)(size_t size) )dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_malloc");
+    if(NULL == AvUtilLibInfo.av_malloc)
+    {
+        printf(" %s: dlsym av_malloc failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_mallocz = (void *(*)(size_t size) )dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_mallocz");
-		if(NULL == AvUtilLibInfo.av_mallocz)
-		{
-			printf(" %s: dlsym av_mallocz failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_mallocz = (void *(*)(size_t size) )dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_mallocz");
+    if(NULL == AvUtilLibInfo.av_mallocz)
+    {
+        printf(" %s: dlsym av_mallocz failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_pix_fmt_desc_get = (const AVPixFmtDescriptor *(*)(enum AVPixelFormat pix_fmt))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_pix_fmt_desc_get");
-		if(NULL == AvUtilLibInfo.av_pix_fmt_desc_get)
-		{
-			printf(" %s: dlsym av_pix_fmt_desc_get failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_pix_fmt_desc_get = (const AVPixFmtDescriptor *(*)(enum AVPixelFormat pix_fmt))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_pix_fmt_desc_get");
+    if(NULL == AvUtilLibInfo.av_pix_fmt_desc_get)
+    {
+        printf(" %s: dlsym av_pix_fmt_desc_get failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_rescale_q = (int64_t (*)(int64_t a, AVRational bq, AVRational cq) )dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_rescale_q");
-		if(NULL == AvUtilLibInfo.av_rescale_q)
-		{
-			printf(" %s: dlsym av_rescale_q failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_rescale_q = (int64_t (*)(int64_t a, AVRational bq, AVRational cq) )dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_rescale_q");
+    if(NULL == AvUtilLibInfo.av_rescale_q)
+    {
+        printf(" %s: dlsym av_rescale_q failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_samples_get_buffer_size = (int (*)(int *linesize, int nb_channels, int nb_samples,enum AVSampleFormat sample_fmt, int align))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_samples_get_buffer_size");
-		if(NULL == AvUtilLibInfo.av_samples_get_buffer_size)
-		{
-			printf(" %s: dlsym av_samples_get_buffer_size failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_samples_get_buffer_size = (int (*)(int *linesize, int nb_channels, int nb_samples,enum AVSampleFormat sample_fmt, int align))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_samples_get_buffer_size");
+    if(NULL == AvUtilLibInfo.av_samples_get_buffer_size)
+    {
+        printf(" %s: dlsym av_samples_get_buffer_size failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_strdup = (char *(*)(const char *s) )dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_strdup");
-		if(NULL == AvUtilLibInfo.av_strdup)
-		{
-			printf(" %s: dlsym av_strdup failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_strdup = (char *(*)(const char *s) )dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_strdup");
+    if(NULL == AvUtilLibInfo.av_strdup)
+    {
+        printf(" %s: dlsym av_strdup failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		AvUtilLibInfo.av_usleep = (int (*)(unsigned usec))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_usleep");
-		if(NULL == AvUtilLibInfo.av_usleep)
-		{
-			printf(" %s: dlsym av_usleep failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    AvUtilLibInfo.av_usleep = (int (*)(unsigned usec))dlsym(AvUtilLibInfo.pAvUtilLibHandle, "av_usleep");
+    if(NULL == AvUtilLibInfo.av_usleep)
+    {
+        printf(" %s: dlsym av_usleep failed, %s\n", __func__, dlerror());
+        return FALSE;
     }
 
     //open libswresample.so
-    if (!SwrLibInfo.pSwrLibHandle)
+    SwrLibInfo.pSwrLibHandle = dlopen("libswresample.so", RTLD_NOW);
+    if(NULL == SwrLibInfo.pSwrLibHandle)
     {
-		SwrLibInfo.pSwrLibHandle = dlopen("libswresample.so", RTLD_NOW);
-		if(NULL == SwrLibInfo.pSwrLibHandle)
-		{
-			printf(" %s: Can not load libswresample.so!\n", __func__);
-			return FALSE;
-		}
+        printf(" %s: Can not load libswresample.so!\n", __func__);
+        return FALSE;
+    }
 
-		SwrLibInfo.swr_alloc_set_opts = (struct SwrContext *(*)(struct SwrContext *s, \
-											  int64_t out_ch_layout, enum AVSampleFormat out_sample_fmt, int out_sample_rate, \
-											  int64_t  in_ch_layout, enum AVSampleFormat  in_sample_fmt, int  in_sample_rate, \
-											  int log_offset, void *log_ctx))dlsym(SwrLibInfo.pSwrLibHandle, "swr_alloc_set_opts");
-		if(NULL == SwrLibInfo.swr_alloc_set_opts)
-		{
-			printf(" %s: dlsym swr_alloc_set_opts failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    SwrLibInfo.swr_alloc_set_opts = (struct SwrContext *(*)(struct SwrContext *s, \
+                                          int64_t out_ch_layout, enum AVSampleFormat out_sample_fmt, int out_sample_rate, \
+                                          int64_t  in_ch_layout, enum AVSampleFormat  in_sample_fmt, int  in_sample_rate, \
+                                          int log_offset, void *log_ctx))dlsym(SwrLibInfo.pSwrLibHandle, "swr_alloc_set_opts");
+    if(NULL == SwrLibInfo.swr_alloc_set_opts)
+    {
+        printf(" %s: dlsym swr_alloc_set_opts failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		SwrLibInfo.swr_convert = (int (*)(struct SwrContext *s, uint8_t **out, int out_count,const uint8_t **in , int in_count))dlsym(SwrLibInfo.pSwrLibHandle, "swr_convert");
-		if(NULL == SwrLibInfo.swr_convert)
-		{
-			printf(" %s: dlsym swr_convert failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    SwrLibInfo.swr_convert = (int (*)(struct SwrContext *s, uint8_t **out, int out_count,const uint8_t **in , int in_count))dlsym(SwrLibInfo.pSwrLibHandle, "swr_convert");
+    if(NULL == SwrLibInfo.swr_convert)
+    {
+        printf(" %s: dlsym swr_convert failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		SwrLibInfo.swr_free = (void (*)(struct SwrContext **s))dlsym(SwrLibInfo.pSwrLibHandle, "swr_free");
-		if(NULL == SwrLibInfo.swr_free)
-		{
-			printf(" %s: dlsym swr_free failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    SwrLibInfo.swr_free = (void (*)(struct SwrContext **s))dlsym(SwrLibInfo.pSwrLibHandle, "swr_free");
+    if(NULL == SwrLibInfo.swr_free)
+    {
+        printf(" %s: dlsym swr_free failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		SwrLibInfo.swr_init = (int (*)(struct SwrContext *s))dlsym(SwrLibInfo.pSwrLibHandle, "swr_init");
-		if(NULL == SwrLibInfo.swr_init)
-		{
-			printf(" %s: dlsym swr_init failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    SwrLibInfo.swr_init = (int (*)(struct SwrContext *s))dlsym(SwrLibInfo.pSwrLibHandle, "swr_init");
+    if(NULL == SwrLibInfo.swr_init)
+    {
+        printf(" %s: dlsym swr_init failed, %s\n", __func__, dlerror());
+        return FALSE;
     }
 
     //open libswresample.so
-    if (!SwsLibInfo.pSwsLibHandle)
+    SwsLibInfo.pSwsLibHandle = dlopen("libswscale.so", RTLD_NOW);
+    if(NULL == SwsLibInfo.pSwsLibHandle)
     {
-		SwsLibInfo.pSwsLibHandle = dlopen("libswscale.so", RTLD_NOW);
-		if(NULL == SwsLibInfo.pSwsLibHandle)
-		{
-			printf(" %s: Can not load libswscale.so!\n", __func__);
-			return FALSE;
-		}
+        printf(" %s: Can not load libswscale.so!\n", __func__);
+        return FALSE;
+    }
 
-		SwsLibInfo.sws_freeContext = (void (*)(struct SwsContext *swsContext))dlsym(SwsLibInfo.pSwsLibHandle, "sws_freeContext");
-		if(NULL == SwsLibInfo.sws_freeContext)
-		{
-			printf(" %s: dlsym sws_freeContext failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    SwsLibInfo.sws_freeContext = (void (*)(struct SwsContext *swsContext))dlsym(SwsLibInfo.pSwsLibHandle, "sws_freeContext");
+    if(NULL == SwsLibInfo.sws_freeContext)
+    {
+        printf(" %s: dlsym sws_freeContext failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		SwsLibInfo.sws_getContext = ( struct SwsContext *(*)(int srcW, int srcH, enum AVPixelFormat srcFormat, \
-									  int dstW, int dstH, enum AVPixelFormat dstFormat, \
-									  int flags, SwsFilter *srcFilter, \
-									  SwsFilter *dstFilter, const double *param))dlsym(SwsLibInfo.pSwsLibHandle, "sws_getContext");
-		if(NULL == SwsLibInfo.sws_getContext)
-		{
-			printf(" %s: dlsym sws_getContext failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    SwsLibInfo.sws_getContext = ( struct SwsContext *(*)(int srcW, int srcH, enum AVPixelFormat srcFormat, \
+                                  int dstW, int dstH, enum AVPixelFormat dstFormat, \
+                                  int flags, SwsFilter *srcFilter, \
+                                  SwsFilter *dstFilter, const double *param))dlsym(SwsLibInfo.pSwsLibHandle, "sws_getContext");
+    if(NULL == SwsLibInfo.sws_getContext)
+    {
+        printf(" %s: dlsym sws_getContext failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
 
-		SwsLibInfo.sws_scale = (int (*)(struct SwsContext *c, const uint8_t *const srcSlice[], \
-				  const int srcStride[], int srcSliceY, int srcSliceH, \
-				  uint8_t *const dst[], const int dstStride[]))dlsym(SwsLibInfo.pSwsLibHandle, "sws_scale");
-		if(NULL == SwsLibInfo.sws_scale)
-		{
-			printf(" %s: dlsym sws_scale failed, %s\n", __func__, dlerror());
-			return FALSE;
-		}
+    SwsLibInfo.sws_scale = (int (*)(struct SwsContext *c, const uint8_t *const srcSlice[], \
+              const int srcStride[], int srcSliceY, int srcSliceH, \
+              uint8_t *const dst[], const int dstStride[]))dlsym(SwsLibInfo.pSwsLibHandle, "sws_scale");
+    if(NULL == SwsLibInfo.sws_scale)
+    {
+        printf(" %s: dlsym sws_scale failed, %s\n", __func__, dlerror());
+        return FALSE;
     }
     
     return 0;
@@ -837,7 +822,7 @@ int player_deinit(player_stat_t *is)
 
     AvUtilLibInfo.av_freep(&is);
     
-    //CloseFFmpegLib();
+    CloseFFmpegLib();
 
     return 0;
 }
