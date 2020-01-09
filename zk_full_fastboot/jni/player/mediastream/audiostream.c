@@ -35,7 +35,6 @@
 
 #define 	MI_AO_PCM_BUF_SIZE_BYTE      (MI_AUDIO_MAX_SAMPLES_PER_FRAME * MI_AUDIO_MAX_FRAME_NUM * 2 * 4)
 
-static int fda;
 static void sdl_audio_callback(void *opaque, uint8_t *stream, int len);
 extern AVPacket a_flush_pkt;
 
@@ -237,14 +236,19 @@ static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
     frame_t *af = NULL;
     frame_queue_t *f = &is->audio_frm_queue;
 
+replay:
     if (is->paused)
         return -1;
 
+    if (is->seek_flags & (1 << 5))
+    {
+        frame_queue_flush(&is->audio_frm_queue);
+        is->seek_flags &= ~(1 << 5);
+    }
+
     // 若队列头部可读，则由af指向可读帧
-#if 0
-    if (!(af = frame_queue_peek_readable(&is->audio_frm_queue)))
-        return -1;
-#else
+    //if (!(af = frame_queue_peek_readable(&is->audio_frm_queue)))
+    //    return -1;
     pthread_mutex_lock(&f->mutex);
     while (f->size - f->rindex_shown <= 0 && !f->pktq->abort_request) {
         printf("wait for audio frame\n");
@@ -259,14 +263,22 @@ static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
     
     if (f->pktq->abort_request)
         return AVERROR_EOF;
-    
+
     af = &f->queue[(f->rindex + f->rindex_shown) % f->max_size];
-#endif
+
     frame_queue_next(&is->audio_frm_queue);
+
+    if (!af->frame->channel_layout || !af->frame->sample_rate || af->frame->format == -1)
+    {
+        printf("invalid audio frame layout sample_rate and format!\n");
+        goto replay;
+    }
+    enum AVSampleFormat sample_fmt = (enum AVSampleFormat)(af->frame->format);
+
     // 根据frame中指定的音频参数获取缓冲区的大小
     data_size = AvUtilLibInfo.av_samples_get_buffer_size(NULL, af->frame->channels,   // 本行两参数：linesize，声道数
         af->frame->nb_samples,       // 本行一参数：本帧中包含的单个声道中的样本数
-        (enum AVSampleFormat)af->frame->format, 1);       // 本行两参数：采样格式，不对齐
+        sample_fmt, 1);       // 本行两参数：采样格式，不对齐
 
     // 获取声道布局
     dec_channel_layout =
@@ -277,7 +289,7 @@ static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
     // 在audio_open()函数中又有“is->audio_src = is->audio_param_tgt”
     // 此处表示：如果frame中的音频参数 == is->audio_src == is->audio_param_tgt，那音频重采样的过程就免了(因此时is->swr_ctr是NULL)
     // 　　　　　否则使用frame(源)和is->audio_param_tgt(目标)中的音频参数来设置is->swr_ctx，并使用frame中的音频参数来赋值is->audio_src
-    if (af->frame->format != is->audio_param_src.fmt ||
+    if (sample_fmt != is->audio_param_src.fmt ||
         dec_channel_layout != is->audio_param_src.channel_layout ||
         af->frame->sample_rate != is->audio_param_src.freq)
     {
@@ -288,13 +300,13 @@ static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
         // 使用frame(源)和is->audio_param_tgt(目标)中的音频参数来设置is->audio_swr_ctx
         is->audio_swr_ctx = SwrLibInfo.swr_alloc_set_opts(NULL,
             is->audio_param_tgt.channel_layout, is->audio_param_tgt.fmt, is->audio_param_tgt.freq,
-            dec_channel_layout, (enum AVSampleFormat)af->frame->format, af->frame->sample_rate,
+            dec_channel_layout, sample_fmt, af->frame->sample_rate,
             0, NULL);
         if (!is->audio_swr_ctx || SwrLibInfo.swr_init(is->audio_swr_ctx) < 0)
         {
             AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR,
                 "Cannot create sample rate converter for conversion of %d Hz %s %d channels to %d Hz %s %d channels!\n",
-                af->frame->sample_rate, AvUtilLibInfo.av_get_sample_fmt_name((enum AVSampleFormat)af->frame->format), af->frame->channels,
+                af->frame->sample_rate, AvUtilLibInfo.av_get_sample_fmt_name(sample_fmt), af->frame->channels,
                 is->audio_param_tgt.freq, AvUtilLibInfo.av_get_sample_fmt_name(is->audio_param_tgt.fmt), is->audio_param_tgt.channels);
             SwrLibInfo.swr_free(&is->audio_swr_ctx);
             return -1;
@@ -303,7 +315,7 @@ static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
         is->audio_param_src.channel_layout = dec_channel_layout;
         is->audio_param_src.channels = af->frame->channels;
         is->audio_param_src.freq = af->frame->sample_rate;
-        is->audio_param_src.fmt = (enum AVSampleFormat)af->frame->format;
+        is->audio_param_src.fmt = sample_fmt;
 
     }
 

@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include "player.h"
 #include "frame.h"
@@ -182,6 +183,8 @@ static void stream_component_close(player_stat_t *is, int stream_index)
         break;
     case AVMEDIA_TYPE_VIDEO:
         video_decoder_abort(is);
+        SwsLibInfo.sws_freeContext(is->img_convert_ctx);
+        AvUtilLibInfo.av_frame_free(&is->p_frm_yuv);
         break;
 
     default:
@@ -216,15 +219,14 @@ static void* idle_thread(void *arg)
             break;
         }
 
-        AvUtilLibInfo.av_usleep((unsigned)(50 * 1000));   //阻塞50ms
+        usleep((unsigned)(50 * 1000));
 
         if (is->play_error < 0)
         {
             if (is->playerController.fpPlayError)
             {
                 is->playerController.fpPlayError(is->play_error);
-                if (is)
-                    is->play_error = 0;
+                is->play_error = 0;
             }
         }
         else
@@ -318,6 +320,20 @@ bool OpenFFmpegLib(void)
     if(NULL == AvCodecLibInfo.avcodec_find_decoder)
     {
         printf(" %s: dlsym avcodec_find_decoder failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
+
+    AvCodecLibInfo.av_packet_alloc = (AVPacket *(*)(void))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "av_packet_alloc");
+    if(NULL == AvCodecLibInfo.av_packet_alloc)
+    {
+        printf(" %s: dlsym av_packet_alloc failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
+
+    AvCodecLibInfo.av_packet_free = (void (*)(AVPacket **pkt))dlsym(AvCodecLibInfo.pAvCodecLibHandle, "av_packet_free");
+    if(NULL == AvCodecLibInfo.av_packet_free)
+    {
+        printf(" %s: dlsym av_packet_free failed, %s\n", __func__, dlerror());
         return FALSE;
     }
 
@@ -459,6 +475,13 @@ bool OpenFFmpegLib(void)
     if(NULL == AvFormatLibInfo.av_read_play)
     {
         printf(" %s: dlsym av_read_play failed, %s\n", __func__, dlerror());
+        return FALSE;
+    }
+
+    AvFormatLibInfo.av_dump_format = (void (*)(AVFormatContext *ic, int index, const char *url, int is_output))dlsym(AvFormatLibInfo.pAvFormatLibHandle, "av_dump_format");
+    if(NULL == AvFormatLibInfo.av_dump_format)
+    {
+        printf(" %s: dlsym av_dump_format failed, %s\n", __func__, dlerror());
         return FALSE;
     }
 
@@ -752,14 +775,8 @@ player_stat_t *player_init(const char *p_input_file)
     init_clock(&is->audio_clk, &is->audio_pkt_queue.serial);
 
     is->abort_request = 0;
-    is->p_frm_yuv = AvUtilLibInfo.av_frame_alloc();
-    if (is->p_frm_yuv == NULL)
-    {
-        printf("av_frame_alloc() for p_frm_raw failed\n");
-        goto fail;
-    }
-    is->av_sync_type = av_sync_type;
-    is->play_error = 0;
+    is->av_sync_type  = av_sync_type;
+    is->play_error    = 0;
 
     pthread_create(&is->idle_tid, NULL, idle_thread, is);
 
@@ -770,7 +787,7 @@ fail:
     frame_queue_destory(&is->audio_frm_queue);
     packet_queue_flush(&is->video_pkt_queue);
     packet_queue_flush(&is->audio_pkt_queue);
-    AvUtilLibInfo.av_frame_free(&is->p_frm_yuv);
+    pthread_cond_destroy(&is->continue_read_thread);
     AvUtilLibInfo.av_freep(&is);
 
     return NULL;
@@ -785,7 +802,7 @@ int player_deinit(player_stat_t *is)
     is->abort_request = 1;
     
     // 如果运行期间没有错误或者解码速度不够,按正常流程退出
-    if (!is->play_error || is->play_error == -3)
+    if (true == is->demux_status)
     {
         pthread_join(is->read_tid, NULL);
 
@@ -802,26 +819,23 @@ int player_deinit(player_stat_t *is)
         }
 
         AvFormatLibInfo.avformat_close_input(&is->p_fmt_ctx);
-
-        SwsLibInfo.sws_freeContext(is->img_convert_ctx);
+        printf("avformat_close_input finish!\n");
     }
     /* free all pictures */
     packet_queue_destroy(&is->video_pkt_queue);
-    
+    printf("video packet_queue_destroy!\n");
     packet_queue_destroy(&is->audio_pkt_queue);
-
+    printf("audio packet_queue_destroy!\n");
     frame_queue_destory(&is->video_frm_queue);
-
+    printf("video frame_queue_destory!\n");
     frame_queue_destory(&is->audio_frm_queue);
-
+    printf("audio frame_queue_destory!\n");
     pthread_cond_destroy(&is->continue_read_thread);
-
-    AvUtilLibInfo.av_frame_free(&is->p_frm_yuv);
-
+    printf("pthread_cond_destroy!\n");
     AvUtilLibInfo.av_free(is->filename);
-
+    printf("av_free filename!\n");
     AvUtilLibInfo.av_freep(&is);
-    
+    printf("av_free is!\n");
     CloseFFmpegLib();
 
     return 0;

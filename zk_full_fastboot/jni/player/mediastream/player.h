@@ -43,6 +43,8 @@ typedef struct AvCodec_LibInfo_s
     AVCodecContext *(*avcodec_alloc_context3)(const AVCodec *codec);
     AVCodec *(*avcodec_find_decoder_by_name)(const char *name);
     AVCodec *(*avcodec_find_decoder)(enum AVCodecID id);
+    AVPacket *(*av_packet_alloc)(void);
+    void (*av_packet_free)(AVPacket **pkt);
     void (*avcodec_flush_buffers)(AVCodecContext *avctx);
     void (*avcodec_free_context)(AVCodecContext **avctx);
     int (*avcodec_open2)(AVCodecContext *avctx, const AVCodec *codec, AVDictionary **options);
@@ -67,6 +69,7 @@ typedef struct AvFormat_LibInfo_s
     int (*av_read_frame)(AVFormatContext *s, AVPacket *pkt);
     int (*av_read_pause)(AVFormatContext *s);
     int (*av_read_play)(AVFormatContext *s);
+    void (*av_dump_format)(AVFormatContext *ic, int index, const char *url, int is_output);
 } AvFormat_LibInfo_t;
 
 typedef struct AvUtil_LibInfo_s
@@ -310,6 +313,7 @@ typedef struct {
 
     int decode_type;
     int play_error;
+    bool demux_status;
 
     player_control_t playerController;
 }   player_stat_t;

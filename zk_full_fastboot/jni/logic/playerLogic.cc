@@ -37,7 +37,6 @@
 #include "mi_sys.h"
 #include "mi_divp.h"
 #include "mi_disp.h"
-#include "mi_vdec.h"
 //#include "mi_panel.h"
 //#include "mi_gfx.h"
 
@@ -132,9 +131,7 @@ static player_stat_t *g_pstPlayStat = NULL;
 // play pos
 static long long g_firstPlayPos = PLAY_INIT_POS;
 static long long g_duration = 0;
-
-// vdec global flag
-static bool g_vdec_conf = false;
+static long long int g_lastpos = 0;
 
 void ShowToolbar(bool bShow)
 {
@@ -313,23 +310,6 @@ MI_S32 CreatePlayerDev()
     MI_SYS_SetChnOutputPortDepth(&stDivpChnPort, 0, 3);
     MI_SYS_BindChnPort(&stDivpChnPort, &stDispChnPort, 30, 30);
 
-    // 5.配置VDEC解码类型B/not B
-    MI_VDEC_InitParam_t stVdecInitParam;
-    // MI_VDEC_InitDev在SYS_Exit退出之前只能执行一次
-    //printf("g_vdec_conf value : %d\n", g_vdec_conf);
-    if (false == g_vdec_conf)
-    {
-        memset(&stVdecInitParam, 0, sizeof(MI_VDEC_InitParam_t));
-        g_vdec_conf = true;
-        #ifdef SUPPORT_B_FRAME
-        stVdecInitParam.bDisableLowLatency = true;
-        #else
-        stVdecInitParam.bDisableLowLatency = false;
-        #endif
-
-        MI_VDEC_InitDev(&stVdecInitParam);
-    }
-
     return 0;
 }
 
@@ -486,7 +466,8 @@ MI_S32 GetCurrentPlayPos(long long currentPos, long long frame_duration)
     char curTime[32];
     long long curSec = 0;
     int trackPos = 0;
-    int lastPos, offsetPos;
+
+    g_lastpos = currentPos;
 
     if (currentPos > g_duration)
     {
@@ -512,12 +493,7 @@ MI_S32 GetCurrentPlayPos(long long currentPos, long long frame_duration)
     mTextview_curtimePtr->setText(curTime);
 
     // update progress bar
-    lastPos   = mSeekbar_progressPtr->getProgress();
-    offsetPos = AV_TIME_BASE * mSeekbar_progressPtr->getMax() / g_duration + 1;
     trackPos  = (currentPos * mSeekbar_progressPtr->getMax()) / g_duration;
-    if ((lastPos - trackPos > offsetPos) || (trackPos - lastPos > offsetPos))
-        return 0;
-
     mSeekbar_progressPtr->setProgress(trackPos);
 
     if (g_firstPlayPos < 0)
@@ -977,7 +953,7 @@ static void onStopTrackingTouch_Seekbar_progress(ZKSeekBar *pSeekBar) {
 	long long curPos = progress * g_duration / mSeekbar_progressPtr->getMax();
 	printf("progress value is %d, max value is %d, duration is %lld, curPos is %lld\n", progress, mSeekbar_progressPtr->getMax(),
 			g_duration, curPos);
-	stream_seek(g_pstPlayStat, curPos, 0, 0);
+	stream_seek(g_pstPlayStat, curPos, (curPos - g_lastpos), 0);
 
 	if (!g_bPause)
 		toggle_pause(g_pstPlayStat);
