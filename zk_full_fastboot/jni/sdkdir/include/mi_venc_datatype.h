@@ -16,11 +16,11 @@
 
 #include "mi_common_datatype.h"
 #include "mi_sys_datatype.h"
-#include "cam_os_wrapper.h"
 
 #define MI_VENC_MAX_CHN_NUM_PER_MODULE (8)
 #define MI_VENC_MAX_CHN_NUM_PER_DC (3)
 #define VENC_CUST_MAP_NUM    (2)
+#define VENC_MAX_SAD_RANGE_NUM (16)
 
 //max supported channel number. But the number would be limited by each module.
 #define VENC_MAX_CHN_NUM    (16) //from SPEC
@@ -167,11 +167,13 @@ typedef enum
     E_MI_VENC_RC_MODE_H264VBR,
     E_MI_VENC_RC_MODE_H264ABR,
     E_MI_VENC_RC_MODE_H264FIXQP,
+    E_MI_VENC_RC_MODE_H264AVBR,
     E_MI_VENC_RC_MODE_MJPEGCBR,
     E_MI_VENC_RC_MODE_MJPEGFIXQP,
     E_MI_VENC_RC_MODE_H265CBR,
     E_MI_VENC_RC_MODE_H265VBR,
     E_MI_VENC_RC_MODE_H265FIXQP,
+    E_MI_VENC_RC_MODE_H265AVBR,
     E_MI_VENC_RC_MODE_MAX,
 } MI_VENC_RcMode_e;
 
@@ -209,6 +211,13 @@ typedef enum
     E_MI_VENC_INPUT_MODE_RING_HALF_FRM, /*Handshake with input by half buffer in ring mode*/
     E_MI_VENC_INPUT_MODE_MAX
 } MI_VENC_InputSrcBufferMode_e;
+
+typedef enum
+{
+    E_MI_VENC_MD_DET=1,
+    E_MI_VENC_ROI_DET,
+    E_MI_VENC_SMART_DET_MAX,
+} MI_VENC_SmartDetType_e;
 
 //==== Structures ====
 
@@ -634,6 +643,17 @@ typedef struct MI_VENC_AttrH264Abr_s
     MI_U32 u32MaxBitRate; /* the max bitrate */
 } MI_VENC_AttrH264Abr_t;
 
+typedef struct MI_VENC_AttrH264Avbr_s
+{
+    MI_U32 u32Gop;
+    MI_U32 u32StatTime;
+    MI_U32 u32SrcFrmRateNum;
+    MI_U32 u32SrcFrmRateDen;
+    MI_U32 u32MaxBitRate;
+    MI_U32 u32MaxQp;
+    MI_U32 u32MinQp;
+} MI_VENC_AttrH264Avbr_t;
+
 typedef struct MI_VENC_AttrMjpegCbr_s
 {
     MI_U32 u32BitRate;
@@ -678,6 +698,17 @@ typedef struct MI_VENC_AttrH265FixQp_s
     MI_U32 u32PQp;
 } MI_VENC_AttrH265FixQp_t;
 
+typedef struct MI_VENC_AttrH265Avbr_s
+{
+    MI_U32 u32Gop;
+    MI_U32 u32StatTime;
+    MI_U32 u32SrcFrmRateNum;
+    MI_U32 u32SrcFrmRateDen;
+    MI_U32 u32MaxBitRate;
+    MI_U32 u32MaxQp;
+    MI_U32 u32MinQp;
+} MI_VENC_AttrH265Avbr_t;
+
 typedef struct MI_VENC_RcAttr_s
 {
     MI_VENC_RcMode_e eRcMode;
@@ -687,11 +718,13 @@ typedef struct MI_VENC_RcAttr_s
         MI_VENC_AttrH264Vbr_t stAttrH264Vbr;
         MI_VENC_AttrH264FixQp_t stAttrH264FixQp;
         MI_VENC_AttrH264Abr_t stAttrH264Abr;
+        MI_VENC_AttrH264Avbr_t stAttrH264Avbr;
         MI_VENC_AttrMjpegCbr_t stAttrMjpegCbr;
         MI_VENC_AttrMjpegFixQp_t stAttrMjpegFixQp;
         MI_VENC_AttrH265Cbr_t stAttrH265Cbr;
         MI_VENC_AttrH265Vbr_t stAttrH265Vbr;
         MI_VENC_AttrH265FixQp_t stAttrH265FixQp;
+        MI_VENC_AttrH265Avbr_t stAttrH265Avbr;
     };
     void* pRcAttr;
 } MI_VENC_RcAttr_t;
@@ -721,6 +754,20 @@ typedef struct MI_VENC_ParamH264Cbr_s
     MI_U32 u32MaxIPProp;
 } MI_VENC_ParamH264Cbr_t;
 
+typedef struct MI_VENC_ParamH264Avbr_s
+{
+    MI_S32 s32IPQPDelta;
+    MI_S32 s32ChangePos;
+    MI_U32 u32MinIQp;
+    MI_U32 u32MaxIPProp;
+    MI_U32 u32MaxIQp;
+    MI_U32 u32MaxISize;
+    MI_U32 u32MaxPSize;
+    MI_U32 u32MinStillPercent;
+    MI_U32 u32MaxStillQp;
+    MI_U32 u32MotionSensitivity;
+} MI_VENC_ParamH264Avbr_t;
+
 typedef struct MI_VENC_ParamMjpegCbr_s
 {
     MI_U32 u32MaxQfactor;
@@ -746,6 +793,20 @@ typedef struct MI_VENC_ParamH265Cbr_s
     MI_U32 u32MaxIPProp;
 } MI_VENC_ParamH265Cbr_t;
 
+typedef struct MI_VENC_ParamH265Avbr_s
+{
+    MI_S32 s32IPQPDelta;
+    MI_S32 s32ChangePos;
+    MI_U32 u32MinIQp;
+    MI_U32 u32MaxIPProp;
+    MI_U32 u32MaxIQp;
+    MI_U32 u32MaxISize;
+    MI_U32 u32MaxPSize;
+    MI_U32 u32MinStillPercent;
+    MI_U32 u32MaxStillQp;
+    MI_U32 u32MotionSensitivity;
+} MI_VENC_ParamH265Avbr_t;
+
 typedef struct MI_VENC_RcParam_s
 {
     MI_U32 au32ThrdI[RC_TEXTURE_THR_SIZE];
@@ -755,9 +816,11 @@ typedef struct MI_VENC_RcParam_s
     {
         MI_VENC_ParamH264Cbr_t stParamH264Cbr;
         MI_VENC_ParamH264Vbr_t stParamH264VBR;
+        MI_VENC_ParamH264Avbr_t stParamH264Avbr;
         MI_VENC_ParamMjpegCbr_t stParamMjpegCbr;
         MI_VENC_ParamH265Cbr_t stParamH265Cbr;
         MI_VENC_ParamH265Vbr_t stParamH265Vbr;
+        MI_VENC_ParamH265Avbr_t stParamH265Avbr;
     };
     void* pRcParam;
 } MI_VENC_RcParam_t;
@@ -824,36 +887,6 @@ typedef struct MI_VENC_InputSourceConfig_s
     MI_VENC_InputSrcBufferMode_e eInputSrcBufferMode;
 }MI_VENC_InputSourceConfig_t;
 
-typedef struct MI_VENC_RuntimeRes_s
-{
-    MI_U32 u32Width;
-    MI_U32 u32Height;
-    MI_U32 u32Size;
-}MI_VENC_RuntimeRes_t;
-
-typedef struct MI_VENC_ApplyMap_s
-{
-    MI_PHY phyAddr;
-    MI_U32 u32MapIdx;
-    MI_U32 u32RunTimeCustMapSize;
-}MI_VENC_ApplyMap_t;
-
-typedef struct MI_VENC_CustomMap_s
-{
-    MI_BOOL bEnabelHistoStaticInfo;
-    MI_U32 u32RunTimeWidth;
-    MI_U32 u32RunTimeHeight;
-    MI_U32 u32RunTimeCustMapSize;
-    MI_U32 u32MaxPicWidth;
-    MI_U32 u32MaxPicHeight;
-    MI_U32 u32MaxCustMapSize;
-    MI_PHY phyAddr[VENC_CUST_MAP_NUM];
-    void  *virAddr[VENC_CUST_MAP_NUM];
-    MI_BOOL  bAvailable[VENC_CUST_MAP_NUM];
-    MI_VENC_ModType_e eType;
-    CamOsMutex_t stMutex;
-} MI_VENC_CustomMap_t;
-
 typedef struct MI_VENC_FrameHistoStaticInfo_s
 {
     MI_U8   u8PicSkip;
@@ -869,17 +902,7 @@ typedef struct MI_VENC_FrameHistoStaticInfo_s
     MI_U32  u32PicNum;
     MI_U32  u32PicDistLow;
     MI_U32  u32PicDistHigh;
-    CamOsMutex_t stMutex;
 } MI_VENC_FrameHistoStaticInfo_t;
-
-typedef struct MI_VENC_CustMapInfo_s
-{
-    MI_PHY phyAddr[VENC_CUST_MAP_NUM];
-    MI_U32 u32MaxWidth;
-    MI_U32 u32MaxHeight;
-    MI_U32 u32MaxSize;
-    MI_VENC_ModType_e eType;
-} MI_VENC_CustMapInfo_t;
 
 typedef struct MI_VENC_AdvCustRcAttr_s
 {
@@ -888,5 +911,21 @@ typedef struct MI_VENC_AdvCustRcAttr_s
     MI_BOOL bEnableModeMap;
     MI_BOOL bEnabelHistoStaticInfo;
 } MI_VENC_AdvCustRcAttr_t;
+
+typedef struct MI_VENC_MdInfo_s
+{
+    MI_U8 u8SadRangeRatio[VENC_MAX_SAD_RANGE_NUM];
+} MI_VENC_MdInfo_t;
+
+typedef struct MI_VENC_SmartDetInfo_s
+{
+    MI_VENC_SmartDetType_e eSmartDetType;
+    union
+    {
+        MI_VENC_MdInfo_t  stMdInfo;
+        MI_BOOL           bRoiExist;
+    };
+    MI_U8                  u8ProtectFrmNum;
+} MI_VENC_SmartDetInfo_t;
 
 #endif /* End of #ifndef __MI_VENC_DATATYPE_ */
