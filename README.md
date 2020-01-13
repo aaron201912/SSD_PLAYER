@@ -72,8 +72,9 @@ customer_player.tar.gz:
 	2. 将bin下zkgui bin拷贝到板子/customer目录下，根据使用的panel选择zkgui_1024x600或zkgui_800x480，以1024x600的panel为例：
 	   copy zkgui_1024x600 /customer/zkgui
 	3. 将lib，res目录拷贝到板子/customer目录下；
-	4. 将IDE导出生成的libzkgui.so复制到/customer/lib下，覆盖同名文件；
-	2. 将IDE导出生成的ui目录复制到/customer/res下，覆盖同名目录
+	4. 如果打开了cloud_play功能，则将libdns拷贝到板子/customer目录下；
+	5. 将IDE导出生成的libzkgui.so复制到/customer/lib下，覆盖同名文件；
+	6. 将IDE导出生成的ui目录复制到/customer/res下，覆盖同名目录
 	
 customer_without_player.tar.gz	
 
@@ -91,7 +92,7 @@ tool:
 	1.将app编译出来的zkgui copy到customer分区；
 	2.将customer_zk的res和lib copy到customer分区；
 	3.将customer_zk的etc下面的文件拷贝到板子/etc下面；
-	4.cd /customer/lib,执行：export LD_LIBRARY_PATH=/lib:$PWD:$LD_LIBRARY_PATH
+	4.cd /customer/lib,执行：export LD_LIBRARY_PATH=/lib:/customer/libdns:$PWD:$LD_LIBRARY_PATH
 	5.运行zkgui: ./zkgui
 	
 	注：如果没有声音可能是功放的gpio没有拉高，可以参考如下步骤拉高：

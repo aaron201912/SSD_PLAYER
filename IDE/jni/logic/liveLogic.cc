@@ -99,7 +99,6 @@ static void onUI_init(){
 	system("echo out > /sys/class/gpio/gpio12/direction");
 	system("echo 1 > /sys/class/gpio/gpio12/value");
 
-
 	/*mTextview_addressPtr->setText(g_file);
 	//SetPlayerControlCallBackk(&g_pstPlayStatt);
 	g_pstPlayStatt.fpPlayError = PlayErrorr;
@@ -126,7 +125,7 @@ static void onUI_intent(const Intent *intentPtr) {
     	g_pstPlayStatt.fpPlayError = PlayErrorr;
     	g_pstPlayStatt.fpPlayComplete = PlayCompletee;
     		//printf("in %p\n",&g_pstPlayStatt.fpPlayError);
-    	tp_player_open(g_file, 0, 0, 1024, 600, &g_pstPlayStatt);
+    	tp_player_open(g_file, 0, 0, MAINWND_W, MAINWND_H, &g_pstPlayStatt);
 
         //TODO
 #endif
