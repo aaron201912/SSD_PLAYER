@@ -218,14 +218,13 @@ static void* demux_thread(void *arg)
             gettimeofday(&now, NULL);
             outtime.tv_sec = now.tv_sec;
             outtime.tv_nsec = now.tv_usec * 1000 + 10 * 1000 * 1000;//timeout 10ms
-            
+
             pthread_cond_timedwait(&is->continue_read_thread,&wait_mutex,&outtime);
-            
+
             //SDL_CondWaitTimeout(is->continue_read_thread, wait_mutex, 10);
             pthread_mutex_unlock(&wait_mutex);
-            
+
             continue;
-            
         }
 
         if (is->seek_req) {
@@ -233,10 +232,10 @@ static void* demux_thread(void *arg)
             int64_t seek_target = is->seek_pos + is->p_fmt_ctx->start_time;
             int64_t seek_min    = is->seek_rel > 0 ? seek_target - is->seek_rel + 2: INT64_MIN;
             int64_t seek_max    = is->seek_rel < 0 ? seek_target - is->seek_rel - 2: INT64_MAX;
-            
+
             // FIXME the +-2 is due to rounding being not done in the correct direction in generation
             // of the seek_pos/seek_rel variables
-
+            is->seek_flags |= AVSEEK_FLAG_BACKWARD;
             ret = AvFormatLibInfo.avformat_seek_file(is->p_fmt_ctx, -1, seek_min, seek_target, seek_max, is->seek_flags);
             //ret = av_seek_frame(is->p_fmt_ctx, is->video_idx, seek_target, AVSEEK_FLAG_ANY);
 
@@ -312,11 +311,17 @@ static void* demux_thread(void *arg)
                 // 输入文件已读完，则往packet队列中发送NULL packet，以冲洗(flush)解码器，否则解码器中缓存的帧取不出来
                 if (is->video_idx >= 0)
                 {
-                    packet_queue_put_nullpacket(&is->video_pkt_queue, is->video_idx);
+                    if (is->video_pkt_queue.nb_packets > 0)
+                        packet_queue_put_nullpacket(&is->video_pkt_queue, is->video_idx);
+                    else
+                        is->video_complete = 1;
                 }
                 if (is->audio_idx >= 0)
                 {
-                    packet_queue_put_nullpacket(&is->audio_pkt_queue, is->audio_idx);
+                    if (is->audio_pkt_queue.nb_packets > 0)
+                        packet_queue_put_nullpacket(&is->audio_pkt_queue, is->audio_idx);
+                    else
+                        is->audio_complete = 1;
                 }
                 is->eof = 1;
             }

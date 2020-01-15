@@ -268,7 +268,7 @@ replay:
 
     frame_queue_next(&is->audio_frm_queue);
 
-    if (!af->frame->channel_layout || !af->frame->sample_rate || af->frame->format == -1)
+    if (!af->frame->channel_layout && !af->frame->sample_rate && af->frame->format == -1)
     {
         printf("invalid audio frame layout sample_rate and format!\n");
         goto replay;

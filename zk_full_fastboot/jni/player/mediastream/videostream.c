@@ -243,7 +243,7 @@ static double compute_target_delay(double delay, player_stat_t *is)
             delay_tim = FFMAX(0, delay + diff);     // 当前帧播放时刻落后于同步时钟(delay+diff<0)则delay=0(视频追赶，立即播放)，否则delay=delay+diff
         else if (diff > 0 && diff < sync_threshold) // 视频时钟超前于同步时钟,在同步时钟域内
             delay_tim = diff;
-        else if (diff >= sync_threshold)            // 视频时钟超前于同步时钟,且超过同步域值
+        else if (diff <= AV_SYNC_FRAMEDUP_THRESHOLD)// 视频时钟超前于同步时钟,且超过同步域值
             delay_tim = 2 * delay;                  // 视频播放要放慢脚步，delay扩大至2倍
         else if (diff > AV_SYNC_FRAMEDUP_THRESHOLD) // 视频时钟超前于同步时钟超过最大值,说明发生跳转
             delay_tim = AV_SYNC_FRAMEDUP_THRESHOLD;

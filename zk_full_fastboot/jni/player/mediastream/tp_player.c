@@ -30,10 +30,10 @@ static int sstar_video_init(uint16_t x, uint16_t y, uint16_t dstWidth, uint16_t 
     stDivpChnAttr.eTnrLevel             = E_MI_DIVP_TNR_LEVEL_OFF;
     stDivpChnAttr.stCropRect.u16X       = 0;
     stDivpChnAttr.stCropRect.u16Y       = 0;
-    stDivpChnAttr.stCropRect.u16Width   = 0;//srcWidth;
-    stDivpChnAttr.stCropRect.u16Height  = 0;///srcHeight;
-    stDivpChnAttr.u32MaxWidth           = 1920;//srcWidth;
-    stDivpChnAttr.u32MaxHeight          = 1080;//srcHeight;
+    stDivpChnAttr.stCropRect.u16Width   = 0;
+    stDivpChnAttr.stCropRect.u16Height  = 0;
+    stDivpChnAttr.u32MaxWidth           = 1920;
+    stDivpChnAttr.u32MaxHeight          = 1080;
 
     memset(&stDivpChnPort, 0, sizeof(MI_SYS_ChnPort_t));
     stDivpChnPort.eModId                = E_MI_MODULE_ID_DIVP;
@@ -47,8 +47,8 @@ static int sstar_video_init(uint16_t x, uint16_t y, uint16_t dstWidth, uint16_t 
     memset(&stDivpOutAttr, 0, sizeof(MI_DIVP_OutputPortAttr_t));
     stDivpOutAttr.eCompMode          = E_MI_SYS_COMPRESS_MODE_NONE;
     stDivpOutAttr.ePixelFormat       = E_MI_SYS_PIXEL_FRAME_YUV_SEMIPLANAR_420;
-    stDivpOutAttr.u32Width           = dstWidth;
-    stDivpOutAttr.u32Height          = dstHeight;
+    stDivpOutAttr.u32Width           = ALIGN_BACK(dstWidth , 32);
+    stDivpOutAttr.u32Height          = ALIGN_BACK(dstHeight, 32);
     MI_DIVP_SetOutputPortAttr(0, &stDivpOutAttr);
 
     // Init DISP module
@@ -58,8 +58,8 @@ static int sstar_video_init(uint16_t x, uint16_t y, uint16_t dstWidth, uint16_t 
     stInputPortAttr.stDispWin.u16Y          = y;
     stInputPortAttr.stDispWin.u16Width      = dstWidth;
     stInputPortAttr.stDispWin.u16Height     = dstHeight;
-    stInputPortAttr.u16SrcWidth             = dstWidth;
-    stInputPortAttr.u16SrcHeight            = dstHeight;
+    stInputPortAttr.u16SrcWidth             = ALIGN_BACK(dstWidth , 32);
+    stInputPortAttr.u16SrcHeight            = ALIGN_BACK(dstHeight, 32);
 
     memset(&stDispChnPort, 0, sizeof(MI_SYS_ChnPort_t));
     stDispChnPort.eModId                    = E_MI_MODULE_ID_DISP;
@@ -351,12 +351,13 @@ int tp_player_open(char *fp, uint16_t x, uint16_t y, uint16_t width, uint16_t he
         ret = open_demux(g_is);
         if (ret < 0)
         {
-        	printf("open_demux failed, player deinit\n");
             player_deinit(g_is);
             g_is = NULL;
             return -1;
         }
 
+        g_is->out_width = width;
+        g_is->out_width = height;
         sstar_audio_init();
         sstar_video_init(x, y, width, height);
 

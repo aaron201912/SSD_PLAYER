@@ -216,6 +216,7 @@ static void* idle_thread(void *arg)
             {
                 is->playerController.fpPlayError(is->play_error);
                 is->play_error = 0;
+                break;
             }
         }
         else
