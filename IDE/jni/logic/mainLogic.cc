@@ -207,7 +207,8 @@ const char* IconTab[]={
 		"rtspActivity",
 		"bluetoothmeshActivity",
 		"cellnetworkActivity",
-		"liveinputActivity"
+		"liveinputActivity",
+		"ttsActivity"
 };
 
 static void onSlideItemClick_Slidewindow1(ZKSlideWindow *pSlideWindow, int index) {

@@ -14,4 +14,8 @@
 
 #define DSPOTTER_DATA_PATH			"/customer/res/DSpotter/data"
 
+#define CREADER_SAVE_FILE			0
+#define CREADER_LIB_PATH			"/customer/lib"
+#define CREADER_DATA_PATH			"/customer/res/CReader/data"
+
 #endif /* JNI_APPCONFIG_H_ */
