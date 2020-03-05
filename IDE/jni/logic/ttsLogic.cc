@@ -32,7 +32,7 @@
 
 #include "appconfig.h"
 #include "tts.h"
-
+#include "statusbarconfig.h"
 
 static bool g_bStopped = true;
 static bool g_bPaused = false;
@@ -139,6 +139,8 @@ static void onUI_quit() {
 		free(g_pLangID);
 		g_pLangID = NULL;
 	}
+
+	ShowStatusBar(1, 0, 0);
 }
 
 /**

@@ -32,6 +32,7 @@
 
 #include <sys/types.h>
 #include <regex.h>
+#include "statusbarconfig.h"
 
 /**
  * 注册定时器
@@ -140,7 +141,7 @@ static void onUI_hide() {
  * 当界面完全退出时触发
  */
 static void onUI_quit() {
-
+	ShowStatusBar(1, 0, 0);
 }
 
 /**

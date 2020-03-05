@@ -31,39 +31,24 @@
 * 在Eclipse编辑器中  使用 “alt + /”  快捷键可以打开智能提示
 */
 #ifdef SUPPORT_WLAN_MODULE
-#include "mi_common_datatype.h"
-#include "mi_wlan.h"
-#include "wifiInfo.h"
 #include <algorithm>
-
+#include "statusbarconfig.h"
+#include "hotplugdetect.h"
 
 #define TIMER_LOADING	0
 #define TIMER_SCAN   	1
-
-typedef struct
-{
-	char ssid[MI_WLAN_MAX_SSID_LEN];
-	char mac[MI_WLAN_MAX_MAC_LEN];
-	bool bEncrypt;
-	bool bConnected;
-	int signalSTR;
-} ScanResult_t;
 
 // loading timer
 static bool isRegistered = false;
 static bool isLoading = false;
 static bool loadingStatus = false;	// save last loading status
-static WLAN_HANDLE wlanHdl;
-static MI_WLAN_Status_t status;
-static MI_WLAN_ScanResult_t scanResult;
-static int namedAPNumber = 0;
-static int nTryCnt = 0;
-static ScanResult_t *pScanResult = NULL;
-static std::vector<ScanResult_t> sScanResult;
-static Mutex lLock;
-
 static bool bLogOn = true;
 #define WIFI_LOG(fmt, args...) {if(bLogOn) {printf("\033[1;34m");printf("%s[%d]:", __FUNCTION__, __LINE__);printf(fmt, ##args);printf("\033[0m");}}
+
+static int g_connStatus = 0;
+static char g_connSsid[256] = {0};
+static std::vector<ScanResult_t> g_vecScanResult;
+static Mutex g_scanResLock;
 
 unsigned long long getSysTime()
 {
@@ -74,55 +59,6 @@ unsigned long long getSysTime()
 	ms = (unsigned long long)(ts.tv_sec * 1000) + (unsigned long long)(ts.tv_nsec / 1000000);
 
 	return ms;
-}
-
-static void saveScanResult(MI_WLAN_ScanResult_t *pScanResult, std::vector<ScanResult_t>* scanInfo)
-{
-	int cnt = pScanResult->u8APNumber;
-	MI_WLAN_ConnectParam_t *pConnParam = getConnectParam();
-
-	scanInfo->clear();
-
-	for(int i = 0; i < cnt;i++)
-	{
-		char *pSsid = (char*)pScanResult->stAPInfo[i].au8SSId;
-		ScanResult_t stScanRes;
-		memset(&stScanRes, 0, sizeof(ScanResult_t));
-		if (pSsid && strcmp(pSsid, "\"\""))
-		{
-			int len = strlen(pSsid);
-
-			strncpy(stScanRes.ssid, pSsid+1, len-2);
-			strcpy(stScanRes.mac, (char*)pScanResult->stAPInfo[i].au8Mac);
-			stScanRes.bEncrypt = pScanResult->stAPInfo[i].bEncryptKey;
-			stScanRes.signalSTR = pScanResult->stAPInfo[i].stQuality.signalSTR;
-			if (getConnectionStatus() && !strcmp(stScanRes.ssid, (char*)pConnParam->au8SSId))
-				stScanRes.bConnected = true;
-			scanInfo->push_back(stScanRes);
-		}
-	}
-}
-
-static bool sortDesc(ScanResult_t a, ScanResult_t b)
-{
-	return (a.signalSTR > b.signalSTR);
-}
-
-static void sortResultBySignalSTR(std::vector<ScanResult_t>* scanInfo)
-{
-	// disp connected ssid first
-	if (getConnectionStatus())
-	{
-		for (vector<ScanResult_t>::iterator it = scanInfo->begin(); it != scanInfo->end(); it++){
-			if (it->bConnected)
-				swap(*(scanInfo->begin()), *it);
-		}
-		sort(scanInfo->begin()+1, scanInfo->end(), sortDesc);
-	}
-	else
-	{
-		sort(scanInfo->begin(), scanInfo->end(), sortDesc);
-	}
 }
 
 static void registerPrivTimer(bool *pIsRegistered, int id, int time) {
@@ -148,105 +84,46 @@ static void updateAnimation() {
     mTextview_loadingPtr->setBackgroundPic(path);
 }
 
-class WifiScanThread : public Thread {
-protected:
-	virtual bool threadLoop() {
-		if (getWifiSupportStatus() && getWifiEnableStatus())
-		{
-			//WIFI_LOG("scan thread running\n");
-			if (!nTryCnt)
-				MI_WLAN_Scan(NULL, &scanResult);
+// 显示连接状态，已连接显示全信号，未连接显示无信号。在scanCallback中更新wifi信号强度
+void WifiConnStatusCallback(char *pSsid, int status)
+{
+	printf("conn ssid: %s, status: %d\n", pSsid, status);
 
-			// loading & get 0 result, do scanning per 50ms
-			if (isLoading && scanResult.u8APNumber == 0)
-			{
-				nTryCnt = 0;
-			}
-			else	// be refreshing or first get no-zero result, do scanning per 5s
-			{
-				//WIFI_LOG("get scan result, change loadStatus to false\n");
-				isLoading = false;
-				if (!nTryCnt)
-				{
-					unregisterPrivTimer(&isRegistered, TIMER_LOADING);
-					mTextview_loadingPtr->setVisible(FALSE);
-					mListviewNetworkPtr->setVisible(TRUE);
-					lLock.lock();
-					saveScanResult(&scanResult, &sScanResult);
-					sortResultBySignalSTR(&sScanResult);
-					lLock.unlock();
+	g_scanResLock.lock();
+	g_connStatus = status;
+	memset(g_connSsid, 0, sizeof(g_connSsid));
+	memcpy(g_connSsid, pSsid, strlen(pSsid));
+	g_scanResLock.unlock();
+}
 
-					mListviewNetworkPtr->refreshListView();
-				}
+// 更新wifi信号强度
+void WifiSignalSTRStatusCallback(ScanResult_t *pstScanResult, int resCnt)
+{
+	g_scanResLock.lock();
+	g_vecScanResult.clear();
 
-				nTryCnt++;
-				if (nTryCnt == 50)
-					nTryCnt = 0;
-			}
-		}
-
-		sleep(100);
-		return true;
-	}
-};
-
-class WifiConnectThread : public Thread {
-public:
-	void setCycleCnt(int cnt, int sleepMs) { nCycleCnt = cnt; nSleepMs = sleepMs; }
-
-protected:
-	virtual bool threadLoop() {
-		if (nCycleCnt-- > 0)
-		{
-			MI_WLAN_GetStatus(&status);
-
-			if(status.stStaStatus.state == WPA_COMPLETED)
-			{
-				WIFI_LOG("wifi connect success: %s %s\n", status.stStaStatus.ip_address, status.stStaStatus.ssid);
-				setConnectionStatus(true);
-
-				// check if status changed in ap list, if changed, refresh listview
-				lLock.lock();
-				for (vector<ScanResult_t>::iterator it = sScanResult.begin(); it != sScanResult.end(); it++){
-					if (!strcmp((char*)status.stStaStatus.ssid, it->ssid))
-					{
-						it->bConnected = true;
-						swap(*(sScanResult.begin()), *it);
-						break;
-					}
-				}
-
-				if (sScanResult.size() > 1)
-					sort(sScanResult.begin()+1, sScanResult.end(), sortDesc);
-				lLock.unlock();
-
-				WIFI_LOG("get wifi info\n");
-				if (mListviewNetworkPtr->isVisible())
-				{
-					mListviewNetworkPtr->refreshListView();
-				}
-
-				WIFI_LOG("update listview\n");
-				return false;
-			}
-
-			if (!nCycleCnt)
-				WIFI_LOG("wifi connect failed\n");
-
-			sleep(nSleepMs);
-			return true;
-		}
-
-		return false;
+	for (int i = 0; i < resCnt; i++)
+	{
+		g_vecScanResult.push_back(pstScanResult[i]);
 	}
 
-private:
-	int nCycleCnt;
-	int nSleepMs;
-};
+	g_scanResLock.unlock();
 
-static WifiScanThread wifiScanThread;
-static WifiConnectThread wifiConnectThread;
+	if (!resCnt)
+	{
+		registerPrivTimer(&isRegistered, TIMER_LOADING, 50);
+		mTextview_loadingPtr->setVisible(true);
+		mListviewNetworkPtr->setVisible(false);
+	}
+	else
+	{
+		unregisterPrivTimer(&isRegistered, TIMER_LOADING);
+		mTextview_loadingPtr->setVisible(false);
+		mListviewNetworkPtr->setVisible(true);
+		mListviewNetworkPtr->refreshListView();
+	}
+}
+
 #endif
 /**
  * 注册定时器
@@ -282,11 +159,18 @@ static void onUI_intent(const Intent *intentPtr) {
 static void onUI_show() {
 #ifdef SUPPORT_WLAN_MODULE
 	WIFI_LOG("onUI_show\n");
-	nTryCnt = 0;
 
-	if (getWifiSupportStatus())
+	SSTAR_RegisterWifiStaConnListener(WifiConnStatusCallback);
+	SSTAR_RegisterWifiStaScanListener(WifiSignalSTRStatusCallback);
+
+	WIFI_LOG("register callback done\n");
+
+	//if (getWifiSupportStatus())
+	if (SSTAR_GetWifiSupportStatus())
 	{
-		bool bWifiEnable = getWifiEnableStatus();
+		WIFI_LOG("support wifi\n");
+		//bool bWifiEnable = getWifiEnableStatus();
+		bool bWifiEnable = (bool)SSTAR_GetWifiEnableStatus();
 		mTextviewNotSupportPtr->setVisible(FALSE);
 		mTextviewWifiPtr->setVisible(TRUE);
 		mButtonWifiswPtr->setVisible(TRUE);
@@ -301,16 +185,11 @@ static void onUI_show() {
 
 			WIFI_LOG("register loading timer\n");
 			registerPrivTimer(&isRegistered, TIMER_LOADING, 50);
-
-			if (!wifiScanThread.isRunning())
-			{
-				WIFI_LOG("start new thread\n");
-				wifiScanThread.run("wifiScan");
-			}
 		}
 	}
 	else
 	{
+		WIFI_LOG("not support wifi\n");
 		mTextviewNotSupportPtr->setVisible(TRUE);
 		mTextviewWifiPtr->setVisible(FALSE);
 		mButtonWifiswPtr->setVisible(FALSE);
@@ -320,9 +199,11 @@ static void onUI_show() {
 
 	mListviewNetworkPtr->setVisible(FALSE);
 
-	lLock.lock();
-	sScanResult.clear();
-	lLock.unlock();
+	g_scanResLock.lock();
+	g_vecScanResult.clear();
+	g_scanResLock.unlock();
+
+	WIFI_LOG("Leave onUI_show\n");
 #endif
 }
 
@@ -332,6 +213,11 @@ static void onUI_show() {
 static void onUI_hide() {
 #ifdef SUPPORT_WLAN_MODULE
 	WIFI_LOG("onUI_hide\n");
+
+	SSTAR_UnRegisterWifiStaConnListener(WifiConnStatusCallback);
+	SSTAR_UnRegisterWifiStaScanListener(WifiSignalSTRStatusCallback);
+
+	unregisterPrivTimer(&isRegistered, TIMER_LOADING);
 #endif
 }
 
@@ -341,16 +227,11 @@ static void onUI_hide() {
 static void onUI_quit() {
 #ifdef SUPPORT_WLAN_MODULE
 	WIFI_LOG("onUI_quit\n");
-	if (wifiScanThread.isRunning())
-	{
-		WIFI_LOG("wait thread exit\n");
-		wifiScanThread.requestExitAndWait();
-	}
 
-	unregisterPrivTimer(&isRegistered, TIMER_LOADING);
-	lLock.lock();
-	sScanResult.clear();
-	lLock.unlock();
+	g_scanResLock.lock();
+	g_vecScanResult.clear();
+	g_scanResLock.unlock();
+	ShowStatusBar(1, 0, 0);
 #endif
 }
 
@@ -429,65 +310,26 @@ static bool onButtonClick_ButtonWifisw(ZKButton *pButton) {
 	WIFI_LOG("onButtonClick_ButtonWifisw\n");
 	BOOL bWifiEnable = FALSE;
 	pButton->setSelected(!pButton->isSelected());
-	wlanHdl = getWlanHandle();
 	bWifiEnable = pButton->isSelected();
-	setWifiEnableStatus(bWifiEnable);
+	SSTAR_SetWifiEnableStatus(bWifiEnable);
 	mTextviewWifiListPtr->setVisible(bWifiEnable);
 	mTextview_loadingPtr->setVisible(bWifiEnable);
 	mListviewNetworkPtr->setVisible(FALSE);
 
 	if (bWifiEnable)
 	{
-		if (!getConnectionStatus() && getWlanHandle() != -1)
-		{
-			// try to connect saved ssid
-			MI_WLAN_ConnectParam_t *pConnParam = getConnectParam();
-			printf("conn param: id=%d, ssid=%s, passwd=%s\n", wlanHdl, (char*)pConnParam->au8SSId, (char*)pConnParam->au8Password);
-			MI_WLAN_Connect(&wlanHdl, pConnParam);
-			wifiConnectThread.setCycleCnt(20, 500);
-			WIFI_LOG("start conn thread\n");
-			wifiConnectThread.run("wifiConnect");
-		}
-
-		isLoading = true;
-		loadingStatus = true;
-		nTryCnt = 0;
-
 		WIFI_LOG("register loading timer\n");
 		registerPrivTimer(&isRegistered, TIMER_LOADING, 50);
-
-		if (!wifiScanThread.isRunning())
-		{
-			WIFI_LOG("start new thread\n");
-			wifiScanThread.run("wifiScan");
-		}
 	}
 	else
 	{
-		if (wifiScanThread.isRunning())
-		{
-			WIFI_LOG("wait thread exit, bgTime=%llu ms\n", getSysTime());
-			wifiScanThread.requestExitAndWait();
-			WIFI_LOG("wait thread exit, endTime=%llu ms\n", getSysTime());
-		}
-
 		unregisterPrivTimer(&isRegistered, TIMER_LOADING);
-
-		if (wlanHdl != -1)
-		{
-			MI_WLAN_Disconnect(wlanHdl);
-			setConnectionStatus(false);
-		}
-
-		WIFI_LOG("clear lv, bgTime=%llu\n", getSysTime());
-		lLock.lock();
-		sScanResult.clear();
-		lLock.unlock();
-		WIFI_LOG("clear lv, endTime=%llu\n", getSysTime());
+		SSTAR_DisconnectWifi();
+		g_scanResLock.lock();
+		g_vecScanResult.clear();
+		g_scanResLock.unlock();
 	}
 
-	setWifiEnableStatus(bWifiEnable);
-	saveWifiConfig();
 #endif
     return false;
 }
@@ -496,9 +338,10 @@ static int getListItemCount_ListviewNetwork(const ZKListView *pListView) {
     //LOGD("getListItemCount_ListviewNetwork !\n");
 #ifdef SUPPORT_WLAN_MODULE
 	int size = 0;
-	lLock.lock();
-	size = sScanResult.size();
-	lLock.unlock();
+
+	g_scanResLock.lock();
+	size = g_vecScanResult.size();
+	g_scanResLock.unlock();
 
 	return size;
 #else
@@ -513,9 +356,11 @@ static void obtainListItemData_ListviewNetwork(ZKListView *pListView,ZKListView:
 	ZKListView::ZKListSubItem *pNameItem = pListItem->findSubItemByID(ID_NETWORKSETTING_SubItemNetworkID);
 	ZKListView::ZKListSubItem *pEncryItem = pListItem->findSubItemByID(ID_NETWORKSETTING_SubItemEncry);
 	ZKListView::ZKListSubItem *pConnectStatusItem = pListItem->findSubItemByID(ID_NETWORKSETTING_SubItemConnected);
-	lLock.lock();
-	const ScanResult_t &scanRes = sScanResult.at(index);
-	lLock.unlock();
+
+	g_scanResLock.lock();
+	const ScanResult_t &scanRes = g_vecScanResult.at(index);
+	bool bConnected = (g_connStatus && !strcmp(scanRes.ssid, g_connSsid));
+	g_scanResLock.unlock();
 
 	pNameItem->setText(scanRes.ssid);
 	pEncryItem->setVisible(scanRes.bEncrypt);
@@ -530,7 +375,7 @@ static void obtainListItemData_ListviewNetwork(ZKListView *pListView,ZKListView:
 		pLevelItem->setBackgroundPic("wifi/wifi_signal_1.png");
 	}
 
-	if (scanRes.bConnected) {
+	if (bConnected) {
 		pConnectStatusItem->setVisible(TRUE);
 	} else {
 		pConnectStatusItem->setVisible(FALSE);
@@ -541,30 +386,14 @@ static void obtainListItemData_ListviewNetwork(ZKListView *pListView,ZKListView:
 static void onListItemClick_ListviewNetwork(ZKListView *pListView, int index, int id) {
     //LOGD(" onListItemClick_ ListviewNetwork  !!!\n");
 #ifdef SUPPORT_WLAN_MODULE
-	lLock.lock();
-	const ScanResult_t &scanRes = sScanResult.at(index);
-	lLock.unlock();
+	g_scanResLock.lock();
+	const ScanResult_t &scanRes = g_vecScanResult.at(index);
+	bool bConnected = (g_connStatus && !strcmp(scanRes.ssid, g_connSsid));
+	g_scanResLock.unlock();
 
-	if (wifiScanThread.isRunning())
+	if (bConnected)
 	{
-		WIFI_LOG("wait thread exit\n");
-		wifiScanThread.requestExitAndWait();
-	}
-
-	unregisterPrivTimer(&isRegistered, TIMER_LOADING);
-
-	if (getConnectionStatus() && !index)
-	{
-		MI_WLAN_ConnectParam_t *pConnParam = getConnectParam();
-		// show connected info
-		if (!strcmp(scanRes.ssid, (char*)pConnParam->au8SSId))
-			EASYUICONTEXT->openActivity("networkSetting2Activity");
-		else	// this case is not exist
-		{
-			Intent* intent = new Intent();
-			intent->putExtra("ssid", string(scanRes.ssid));
-			EASYUICONTEXT->openActivity("networkSetting3Activity", intent);
-		}
+		EASYUICONTEXT->openActivity("networkSetting2Activity");
 	}
 	else
 	{

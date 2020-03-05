@@ -4,6 +4,8 @@
 #include "manager/ConfigManager.h"
 #include "manager/LanguageManager.h"
 #include <termio.h>
+#include "statusbarconfig.h"
+
 #define TYPE_HEX  "16进制"
 #define TYPE_TEXT "文本"
 
@@ -107,7 +109,7 @@ static void onUI_hide() {
  * 当界面完全退出时触发
  */
 static void onUI_quit() {
-
+	ShowStatusBar(1, 0, 0);
 }
 
 /**

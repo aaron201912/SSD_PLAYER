@@ -30,11 +30,8 @@
 * 在Eclipse编辑器中  使用 “alt + /”  快捷键可以打开智能提示
 */
 #ifdef SUPPORT_WLAN_MODULE
-#include "mi_common_datatype.h"
-#include "mi_wlan.h"
-#include "wifiInfo.h"
 #include <string.h>
-
+#include "hotplugdetect.h"
 
 static MI_WLAN_Status_t status;
 
@@ -94,24 +91,12 @@ static void onUI_intent(const Intent *intentPtr) {
         //TODO
     }
 #ifdef SUPPORT_WLAN_MODULE
-    MI_WLAN_GetStatus(&status);
+    SSTAR_GetWifiCurConnStatus(&status);
 
-	if(status.stStaStatus.state == WPA_COMPLETED)
-	{
-		printf("%s %s\n", status.stStaStatus.ip_address, status.stStaStatus.ssid);
-		mTextview_connected_ssidPtr->setText((char*)status.stStaStatus.ssid);
-		mTextview_connected_ipPtr->setText((char*)status.stStaStatus.ip_address);
-		mTextview_connected_macPtr->setText(strupr((char*)status.stStaStatus.bssid));
-		mTextview_connected_encryptionPtr->setText(strupr((char*)status.stStaStatus.key_mgmt));
-	}
-	else
-	{
-		printf("wifi inconnected\n");
-		mTextview_connected_ssidPtr->setText("");
-		mTextview_connected_ipPtr->setText("");
-		mTextview_connected_macPtr->setText("");
-		mTextview_connected_encryptionPtr->setText("");
-	}
+    mTextview_connected_ssidPtr->setText((char*)status.stStaStatus.ssid);
+	mTextview_connected_ipPtr->setText((char*)status.stStaStatus.ip_address);
+	mTextview_connected_macPtr->setText(strupr((char*)status.stStaStatus.bssid));
+	mTextview_connected_encryptionPtr->setText(strupr((char*)status.stStaStatus.key_mgmt));
 #endif
 }
 
@@ -195,10 +180,7 @@ static bool onButtonClick_Button_connected_disconn(ZKButton *pButton) {
     //LOGD(" ButtonClick Button_connected_disconn !!!\n");
 #ifdef SUPPORT_WLAN_MODULE
 	printf("page2 disconnect\n");
-	MI_WLAN_Disconnect(getWlanHandle());
-	setConnectionStatus(false);
-
-	//EASYUICONTEXT->goBack();
+	SSTAR_DisconnectWifi();
 	EASYUICONTEXT->closeActivity("networkSetting2Activity");
 #endif
     return false;

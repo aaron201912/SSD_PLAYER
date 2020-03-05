@@ -1,4 +1,5 @@
 #include "media/ZKMediaPlayer.h"
+#include "statusbarconfig.h"
 
 static ZKMediaPlayer *sAudioPlayerPtr = NULL;
 static std::vector<string> sMediaFileList;
@@ -178,6 +179,7 @@ static void onUI_quit() {
     system("echo 3 > /proc/sys/vm/drop_caches");
 
     SSTAR_stopVideo();
+    ShowStatusBar(1, 0, 0);
 }
 
 /**

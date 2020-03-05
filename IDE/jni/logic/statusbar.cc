@@ -28,6 +28,58 @@
 
 */
 
+#include "hotplugdetect.h"
+
+static int g_connStatus = 0;
+
+
+void ShowWiredNetworkStatus(unsigned int index, int status, char *pstIfName)
+{
+	if (status)
+		mTextView_wiredNetStatusPtr->setBackgroundPic("hotplugstatus/connected.png");
+	else
+		mTextView_wiredNetStatusPtr->setBackgroundPic("hotplugstatus/disconnecte.png");
+}
+
+// 显示连接状态，已连接显示全信号，未连接显示无信号。在scanCallback中更新wifi信号强度
+void ShowWifiConnStatus(char *pSsid, int status)
+{
+	printf("conn ssid: %s, status: %d\n", pSsid, status);
+
+	g_connStatus = status;
+
+	if (g_connStatus)
+		mTextView_wifiStatusPtr->setBackgroundPic("hotplugstatus/wifi_signal_4.png");
+	else
+		mTextView_wifiStatusPtr->setBackgroundPic("hotplugstatus/wifi_no_signal.png");
+}
+
+// 更新wifi信号强度
+void ShowWifiSignalSTRStatus(ScanResult_t *pstScanResult, int resCnt)
+{
+	if (g_connStatus)
+	{
+		if (resCnt > 0)
+		{
+			if (pstScanResult[0].signalSTR > -50)
+				mTextView_wifiStatusPtr->setBackgroundPic("hotplugstatus/wifi_signal_4.png");
+			else if (pstScanResult[0].signalSTR > -60)
+				mTextView_wifiStatusPtr->setBackgroundPic("hotplugstatus/wifi_signal_3.png");
+			else if (pstScanResult[0].signalSTR > -70)
+				mTextView_wifiStatusPtr->setBackgroundPic("hotplugstatus/wifi_signal_2.png");
+			else
+				mTextView_wifiStatusPtr->setBackgroundPic("hotplugstatus/wifi_signal_1.png");
+		}
+	}
+}
+
+
+void ShowUsbStatus(UsbParam_t *pstUsbParam)		// action 0, connect; action 1, disconnect
+{
+	mTextView_usbStatusPtr->setVisible(pstUsbParam->action);
+}
+
+
 /**
  * 注册定时器
  * 在此数组中添加即可
@@ -39,10 +91,29 @@ static S_ACTIVITY_TIMEER REGISTER_ACTIVITY_TIMER_TAB[] = {
 
 static void onUI_init(){
     //Tips :添加 UI初始化的显示代码到这里,如:mText1->setText("123");
+	printf("statusbar init start\n");
+	SSTAR_InitHotplugDetect();
+//	SSTAR_RegisterWiredNetworkListener(ShowWiredNetworkStatus);
+	SSTAR_RegisterWifiStaConnListener(ShowWifiConnStatus);
+	SSTAR_RegisterWifiStaScanListener(ShowWifiSignalSTRStatus);
+	SSTAR_RegisterUsbListener(ShowUsbStatus);
+
+	mTextView_usbStatusPtr->setVisible(SSTAR_GetUsbCurrentStatus());
+
+	if (SSTAR_GetWiredNetworkCurrentStatus())
+		mTextView_wiredNetStatusPtr->setBackgroundPic("hotplugstatus/connected.png");
+	else
+		mTextView_wiredNetStatusPtr->setBackgroundPic("hotplugstatus/disconnect.png");
+
+	printf("statusbar init end\n");
 }
 
 static void onUI_quit() {
-
+	SSTAR_UnRegisterUsbListener(ShowUsbStatus);
+	SSTAR_UnRegisterWifiStaScanListener(ShowWifiSignalSTRStatus);
+	SSTAR_UnRegisterWifiStaConnListener(ShowWifiConnStatus);
+//	SSTAR_UnRegisterWiredNetworkListener(ShowWiredNetworkStatus);
+	SSTAR_DeinitHotPlugDetect();
 }
 
 static void onProtocolDataUpdate(const SProtocolData &data) {
@@ -68,6 +139,16 @@ static bool onButtonClick_sys_back(ZKButton *pButton) {
 
 static bool onButtonClick_sys_home(ZKButton *pButton) {
     //LOGD(" ButtonClick sys_home !!!\n");
-    return true;
+    return false;
 }
 
+void ShowStatusBar(int visible, int enableReturnKey, int enableHomeKey)
+{
+	msys_backPtr->setVisible(enableReturnKey);
+	msys_homePtr->setVisible(enableHomeKey);
+
+	if (visible)
+		EASYUICONTEXT->showStatusBar();
+	else
+		EASYUICONTEXT->hideStatusBar();
+}

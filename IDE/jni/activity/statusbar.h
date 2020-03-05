@@ -21,6 +21,9 @@
 #include "control/ZKVideoView.h"
 #include "window/ZKSlideWindow.h"
 /*TAG:Macro宏ID*/
+#define ID_STATUSBAR_TextView_usbStatus    50003
+#define ID_STATUSBAR_TextView_wifiStatus    50002
+#define ID_STATUSBAR_TextView_wiredNetStatus    50001
 #define ID_STATUSBAR_sys_home   101
 #define ID_STATUSBAR_Digitalclock1    93001
 #define ID_STATUSBAR_sys_back   100

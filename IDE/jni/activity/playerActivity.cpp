@@ -4,6 +4,10 @@
 #include "playerActivity.h"
 
 /*TAG:GlobalVariable全局变量*/
+static ZKTextView* mTextView_picPtr;
+static ZKButton* mButton_circlemodePtr;
+static ZKButton* mButton_nextPtr;
+static ZKButton* mButton_prevPtr;
 static ZKWindow* mWindow_mediaInfoPtr;
 static ZKWindow* mWindow_playBarPtr;
 static ZKButton* mButton_confirmPtr;
@@ -62,6 +66,9 @@ typedef struct {
 
 /*TAG:ButtonCallbackTab按键映射表*/
 static S_ButtonCallback sButtonCallbackTab[] = {
+    ID_PLAYER_Button_circlemode, onButtonClick_Button_circlemode,
+    ID_PLAYER_Button_next, onButtonClick_Button_next,
+    ID_PLAYER_Button_prev, onButtonClick_Button_prev,
     ID_PLAYER_Button_confirm, onButtonClick_Button_confirm,
     ID_PLAYER_Button_voice, onButtonClick_Button_voice,
     ID_PLAYER_Button_fast, onButtonClick_Button_fast,
@@ -166,6 +173,10 @@ const char* playerActivity::getAppName() const{
 //TAG:onCreate
 void playerActivity::onCreate() {
 	Activity::onCreate();
+    mTextView_picPtr = (ZKTextView*)findControlByID(ID_PLAYER_TextView_pic);
+    mButton_circlemodePtr = (ZKButton*)findControlByID(ID_PLAYER_Button_circlemode);
+    mButton_nextPtr = (ZKButton*)findControlByID(ID_PLAYER_Button_next);
+    mButton_prevPtr = (ZKButton*)findControlByID(ID_PLAYER_Button_prev);
     mWindow_mediaInfoPtr = (ZKWindow*)findControlByID(ID_PLAYER_Window_mediaInfo);
     mWindow_playBarPtr = (ZKWindow*)findControlByID(ID_PLAYER_Window_playBar);
     mButton_confirmPtr = (ZKButton*)findControlByID(ID_PLAYER_Button_confirm);

@@ -59,15 +59,17 @@ INCLUDE_DIR := -I$(EASYUI_COMMON_INCLUDE) \
 LDFLAGS =  -leasyui -pthread -lmi_sys -lmi_disp -lmi_panel -lmi_ao -lmi_gfx -lmi_divp -lmi_vdec -lmi_common -lstdc++ -lmi_ai -lDSpotter -lCReader -ldl -lrt
 LDFLAGS += -L$(ZKSW_PREBUILT_LIB_PATH)/system -L. -L ../jni/sdkdir/lib
 
-INCLUDE_DIR += -I ../jni/player -I ../jni/player/ffmpeg/include -I ../jni/player/mediastream -I ../jni/player/usbdetect
+INCLUDE_DIR += -I ../jni/player -I ../jni/player/ffmpeg/include -I ../jni/player/mediastream -I ../jni/player/imagedata
 INCLUDE_DIR += -I ../jni/v4l2/inc -I ../jni/v4l2/inc/uvc -I ../jni/v4l2/inc/video -I ../jni/v4l2/src -I ../jni/v4l2/src/control -I ../jni/v4l2/src/gcc \
                -I ../jni/v4l2/src/libv4l -I ../jni/v4l2/src/processing
+INCLUDE_DIR += -I ../jni/hotplugdetect -I ../jni/hotplugdetect/common -I ../jni/hotplugdetect/usbdetect -I ../jni/hotplugdetect/wifidetect \
+			   -I ../jni/hotplugdetect/wirednetworkdetect
 
 ifneq ($(CONFIG_WLAN_SWITCH),)
 CFLAGS+=-DSUPPORT_WLAN_MODULE
 CXXFLAGS+=-DSUPPORT_WLAN_MODULE
 
-INCLUDE_DIR += -I ../jni/wifi
+#INCLUDE_DIR += -I ../jni/hotplugdetect/wifidetect
 LDFLAGS += -lmi_wlan -lcjson
 endif
 

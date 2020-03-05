@@ -38,6 +38,7 @@
 #include "mi_divp.h"
 #include "mi_disp.h"
 #include "panelconfig.h"
+#include "statusbarconfig.h"
 
 #define VDEC_CHN				0
 #define DIVP_CHN        		0
@@ -443,6 +444,7 @@ static void onUI_quit() {
 	StopCapture();
 	V4L2_DisableVdec(VDEC_CHN, DIVP_CHN);
 	DestroyV4L2Pipe();
+	ShowStatusBar(1, 0, 0);
 }
 
 /**

@@ -34,20 +34,22 @@
 #include <sys/types.h>
 #include <string.h>
 #include <time.h>
+#include <pthread.h>
 #include "mi_sys.h"
 #include "mi_divp.h"
 #include "mi_disp.h"
 //#include "mi_panel.h"
 //#include "mi_gfx.h"
-
-#include "usbdetect.h"
+#include "utils/BitmapHelper.h"
 #include "frame.h"
 #include "demux.h"
 #include "videostream.h"
 #include "audiostream.h"
 #include "player.h"
 #include "panelconfig.h"
+#include "hotplugdetect.h"
 
+#include "imageplayer.h"
 
 #define UI_MAX_WIDTH			800
 #define UI_MAX_HEIGHT			480
@@ -76,6 +78,7 @@
 #define VOL_ADJUST_FACTOR		2
 #define PROGRESS_UPDATE_TIME_INTERVAL	500000		// 0.5s
 
+#define DISPLAY_PIC_DURATION	5000000				// 5s
 
 typedef enum
 {
@@ -100,10 +103,23 @@ typedef enum
     E_32X_SPEED
 }PlaySpeedMode_e;
 
+typedef enum
+{
+	FILE_REPEAT_MODE,
+	LIST_REPEAT_MODE
+}RepeatMode_e;
+
+typedef enum
+{
+	NO_SKIP,
+	SKIP_NEXT,
+	SKIP_PREV
+}SkipMode_e;
+
 // playing page
-static bool g_bShowPlayToolBar = FALSE;          // select file list page or playing page
-static bool g_bPlaying = FALSE;
-static bool g_bPause = FALSE;
+static bool g_bShowPlayToolBar = FALSE;         // select file list page or playing page
+static bool g_bPlaying = FALSE;					// 正在播放状态
+static bool g_bPause = FALSE;					// 播放暂停状态
 static bool g_bMute = FALSE;
 static int g_s32VolValue = 20;
 static bool g_ePlayDirection = E_PLAY_FORWARD;
@@ -116,27 +132,58 @@ static unsigned int g_u32SpeedDenomonator = 1;
 static int g_playViewWidth = PANEL_MAX_WIDTH;
 static int g_playViewHeight = PANEL_MAX_HEIGHT;
 
-// media file video size
-static int g_videoStreamWidth = 1280;
-static int g_videoStreamHeight = 720;
-
-// play circle, play list
-static bool g_bPlayCircle = false;
-static bool g_bPlayInList = false;
-// file list, get from playlist.txt
-
-static std::string fileName;
+// streamplayer & imagePlayer
+static std::string g_fileName;
 static player_stat_t *g_pstPlayStat = NULL;
+static ImagePlayer_t *g_pstImagePlayer = NULL;
+static ImagePlayerCtrl_t g_stImagePlayerOps;
 
 // play pos
 static long long g_firstPlayPos = PLAY_INIT_POS;
 static long long g_duration = 0;
 static long long int g_lastpos = 0;
 
+// play video/audio or picture
+static int g_playStream = 0;
+static pthread_t g_playFileThread = 0;
+static bool g_bPlayFileThreadExit = false;
+static bool g_bPlayCompleted = false;
+static bool g_bPlayError = false;
+static RepeatMode_e g_eRepeatMode = LIST_REPEAT_MODE;
+static SkipMode_e g_eSkipMode = NO_SKIP;
+static pthread_mutex_t g_playFileMutex;
+
+extern void GetPrevFile(char *pCurFileFullName, char *pPrevFileFullName, int prevFilePathLen);
+extern void GetNextFile(char *pCurFileFullName, char *pNextFileFullName, int nextFilePathLen);
+extern int IsMediaStreamFile(char *pCurFileFullName);
+
 void ShowToolbar(bool bShow)
 {
 	mWindow_playBarPtr->setVisible(bShow);
 	mWindow_mediaInfoPtr->setVisible(bShow);
+
+	if (g_playStream)
+	{
+		mTextview_volTitlePtr->setVisible(true);
+		mTextview_volumePtr->setVisible(true);
+		mSeekbar_progressPtr->setVisible(true);
+		mButton_voicePtr->setVisible(true);
+		mSeekbar_volumnPtr->setVisible(true);
+		mTextview_slashPtr->setVisible(true);
+		mTextview_durationPtr->setVisible(true);
+		mTextview_curtimePtr->setVisible(true);
+	}
+	else
+	{
+		mTextview_volTitlePtr->setVisible(false);
+		mTextview_volumePtr->setVisible(false);
+		mSeekbar_progressPtr->setVisible(false);
+		mButton_voicePtr->setVisible(false);
+		mSeekbar_volumnPtr->setVisible(false);
+		mTextview_slashPtr->setVisible(false);
+		mTextview_durationPtr->setVisible(false);
+		mTextview_curtimePtr->setVisible(false);
+	}
 }
 
 class ToolbarHideThread : public Thread {
@@ -175,7 +222,7 @@ void AutoDisplayToolbar()
 	}
 	else
 	{
-		printf("wait thread exit\n");
+		printf("wait hideToolBarthread exit\n");
 		g_hideToolbarThread.requestExitAndWait();
 		g_hideToolbarThread.setCycleCnt(100, 50);
 		g_hideToolbarThread.run("hideToolbar");
@@ -437,12 +484,12 @@ static void ResetSpeedMode()
 }
 
 // duration, format, width, height, I-frame/P-frame, etc.
-MI_S32 GetMediaInfo()
+MI_S32 GetStreamFileInfo()
 {
     return 0;
 }
 
-MI_S32 GetDuration(long long duration)
+MI_S32 GetStreamFileDuration(long long duration)
 {
 	char totalTime[32];
 	long long durationSec = duration / AV_TIME_BASE;
@@ -461,7 +508,7 @@ MI_S32 GetDuration(long long duration)
 	return 0;
 }
 
-MI_S32 GetCurrentPlayPos(long long currentPos, long long frame_duration)
+MI_S32 GetStreamFilePlayPos(long long currentPos, long long frame_duration)
 {
     char curTime[32];
     long long curSec = 0;
@@ -501,8 +548,6 @@ MI_S32 GetCurrentPlayPos(long long currentPos, long long frame_duration)
 
     return 0;
 }
-
-
 
 // MI display video
 MI_S32 DisplayVideo(MI_S32 s32DispWidth, MI_S32 s32DispHeight, void *pYData, void *pUVData)
@@ -606,28 +651,20 @@ MI_S32 ResumeAudio()
 }
 
 // stay in playing page, clear play status
-MI_S32 PlayComplete()
+MI_S32 PlayStreamFileComplete()
 {
-    g_bPlaying = false;
-    g_bPause = false;
-    player_deinit(g_pstPlayStat);
-    StopPlayAudio();
-    StopPlayVideo();
-    ResetSpeedMode();
-
-    SetPlayingStatus(false);
+	SetPlayingStatus(false);
 	mTextview_speedPtr->setText("");
 	g_bShowPlayToolBar = FALSE;
 
-	// reset pts
-	g_firstPlayPos = PLAY_INIT_POS;
-
-	EASYUICONTEXT->goBack();
+	pthread_mutex_lock(&g_playFileMutex);
+	g_bPlayCompleted = true;
+	pthread_mutex_unlock(&g_playFileMutex);
     return 0;
 }
 
 // stay in playing page , clear play status,
-MI_S32 PlayError(int error)
+MI_S32 PlayStreamFileError(int error)
 {
     if (error == -101)
         mTextview_msgPtr->setText("请检查网络连接！");
@@ -642,38 +679,77 @@ MI_S32 PlayError(int error)
         
     mWindow_errMsgPtr->setVisible(true);
 
-    // stop play video & audio
-    g_bPlaying = FALSE;
-    g_bPause = FALSE;
-    printf("error in playing!\n");
-    // sendmessage to stop playing
-    player_deinit(g_pstPlayStat);
-    StopPlayAudio();
-    StopPlayVideo();
-    ResetSpeedMode();
-
-    SetPlayingStatus(false);
-    mTextview_speedPtr->setText("");
-    g_bShowPlayToolBar = FALSE;
-
-    //EASYUICONTEXT->goBack();
+    pthread_mutex_lock(&g_playFileMutex);
+	g_bPlayError = true;
+	pthread_mutex_unlock(&g_playFileMutex);
 
     return 0;
 }
 
-static void SetPlayerControlCallBack(player_stat_t *is)
+int GetImageFileDuration(long long duration)
 {
-	is->playerController.fpGetMediaInfo = GetMediaInfo;
-	is->playerController.fpGetDuration = GetDuration;
-	is->playerController.fpGetCurrentPlayPos = GetCurrentPlayPos;
+	char totalTime[32] = {0};
+	long long durationSec = 0;
+
+	g_duration = duration;
+	durationSec = g_duration / AV_TIME_BASE;
+	sprintf(totalTime, "%02lld:%02lld:%02lld", durationSec/3600, (durationSec%3600)/60, durationSec%60);
+	mTextview_durationPtr->setText(totalTime);
+	mTextview_curtimePtr->setText("00:00:00");
+	mSeekbar_progressPtr->setProgress(0);
+
+	return 0;
+}
+
+int GetImageFilePlayPos(long long currentPos)
+{
+	char curTime[32];
+	long long curSec = 0;
+	int trackPos = 0;
+
+	printf("Enter GetImageFilePlayPos\n");
+	printf("currentPos is %lld\n", currentPos);
+	curSec = currentPos / AV_TIME_BASE;
+	trackPos  = (currentPos * mSeekbar_progressPtr->getMax()) / g_duration;
+	memset(curTime, 0, sizeof(curTime));
+	sprintf(curTime, "%02lld:%02lld:%02lld", curSec/3600, (curSec%3600)/60, curSec%60);
+	printf("image curTime: %s\n", curTime);
+	mTextview_curtimePtr->setText(curTime);
+	mSeekbar_progressPtr->setProgress(trackPos);
+	printf("Leave GetImageFilePlayPos\n");
+
+	return 0;
+}
+
+MI_S32 PlayImageFileComplete()
+{
+	printf("Enter PlayImageFileComplete\n");
+	SetPlayingStatus(false);
+	mTextView_picPtr->setVisible(false);
+	mTextview_curtimePtr->setText("00:00:00");
+	mSeekbar_progressPtr->setProgress(0);
+
+	pthread_mutex_lock(&g_playFileMutex);
+	g_bPlayCompleted = true;
+	pthread_mutex_unlock(&g_playFileMutex);
+	printf("Leave PlayImageFileComplete\n");
+
+	return 0;
+}
+
+static void SetStreamPlayerControlCallBack(player_stat_t *is)
+{
+	is->playerController.fpGetMediaInfo = GetStreamFileInfo;
+	is->playerController.fpGetDuration = GetStreamFileDuration;
+	is->playerController.fpGetCurrentPlayPos = GetStreamFilePlayPos;
 	is->playerController.fpGetCurrentPlayPosFromVideo = NULL;
 	is->playerController.fpGetCurrentPlayPosFromAudio = NULL;
 	is->playerController.fpDisplayVideo = DisplayVideo;
 	is->playerController.fpPlayAudio = PlayAudio;
 	is->playerController.fpPauseAudio = PauseAudio;
 	is->playerController.fpResumeAudio = ResumeAudio;
-	is->playerController.fpPlayComplete = PlayComplete;
-	is->playerController.fpPlayError = PlayError;
+	is->playerController.fpPlayComplete = PlayStreamFileComplete;
+	is->playerController.fpPlayError = PlayStreamFileError;
 }
 
 static void AdjustVolumeByTouch(int startPos, int endPos)
@@ -692,6 +768,322 @@ static void AdjustVolumeByTouch(int startPos, int endPos)
 	sprintf(volInfo, "%d%%", progress);
 	mTextview_volumePtr->setText(volInfo);
 	printf("set progress: %d\n", progress);
+}
+
+void DetectUsbHotplug(UsbParam_t *pstUsbParam)		// action 0, connect; action 1, disconnect
+{
+	if (!pstUsbParam->action)
+	{
+		g_bPlaying = FALSE;
+		g_bPause = FALSE;
+
+		// sendmessage to stop playing
+		player_deinit(g_pstPlayStat);
+		StopPlayAudio();
+		StopPlayVideo();
+
+		SetPlayingStatus(false);
+		ResetSpeedMode();
+		mTextview_speedPtr->setText("");
+		g_bShowPlayToolBar = FALSE;
+
+		EASYUICONTEXT->goHome();
+	}
+}
+
+static void StartPlayStreamFile(char *pFileName)
+{
+	// ffmpeg_player初始化 & ui初始化
+	mWindow_errMsgPtr->setVisible(false);
+	// init player
+	ResetSpeedMode();
+	StartPlayVideo();
+	StartPlayAudio();
+
+	g_pstPlayStat = player_init(pFileName);
+	if (!g_pstPlayStat)
+	{
+		StopPlayAudio();
+		StopPlayVideo();
+		printf("Initilize player failed!\n");
+		return;
+	}
+	g_pstPlayStat->out_width  = g_playViewWidth;
+	g_pstPlayStat->out_height = g_playViewHeight;
+	printf("video file name is : %s\n", g_pstPlayStat->filename);
+
+	SetStreamPlayerControlCallBack(g_pstPlayStat);
+	printf("open_demux\n");
+	open_demux(g_pstPlayStat);
+	printf("open_video\n");
+	open_video(g_pstPlayStat);
+	printf("open_audio\n");
+	open_audio(g_pstPlayStat);
+	SetPlayerVolumn(g_s32VolValue);
+}
+
+static void StopPlayStreamFile()
+{
+	printf("Start to StopPlayStreamFile\n");
+
+	// ffmpeg_player反初始化 & ui反初始化
+	g_bPlaying = false;
+	g_bPause = false;
+	player_deinit(g_pstPlayStat);
+	StopPlayAudio();
+	StopPlayVideo();
+	ResetSpeedMode();
+
+	SetPlayingStatus(false);
+	mTextview_speedPtr->setText("");
+	mTextview_curtimePtr->setText("00:00:00");
+	mSeekbar_progressPtr->setProgress(0);
+
+	// reset pts
+	g_firstPlayPos = PLAY_INIT_POS;
+
+	printf("End of StopPlayStreamFile\n");
+}
+
+static void TogglePlayStreamFile()
+{
+	toggle_pause(g_pstPlayStat);
+}
+
+static void StartDisplayImage(char *pFileName)
+{
+	ImagePlayerCtrl_t stPlayerCtrl;
+
+	printf("Enter StartDisplayImage, fileName is %s\n", pFileName);
+	stPlayerCtrl.fpGetDuration = GetImageFileDuration;
+	stPlayerCtrl.fpGetCurrentPlayPos = GetImageFilePlayPos;
+	stPlayerCtrl.fpDisplayComplete = PlayImageFileComplete;
+	StartPlayAudio();
+
+	g_pstImagePlayer = ImagePlayer_Init(&stPlayerCtrl);
+	if (!g_pstImagePlayer)
+	{
+		StopPlayAudio();
+		printf("ImagePlayer_Init exec failed\n");
+		return;
+	}
+
+	BITMAP *pBmp = NULL;
+	BitmapHelper::loadBitmapFromFile(pBmp, pFileName);
+	int imgWidth = pBmp->bmWidth;
+	int imgHeight = pBmp->bmHeight;
+	BitmapHelper::unloadBitmap(pBmp);
+	LayoutPosition imgPosition = mTextView_picPtr->getPosition();
+	imgPosition.mLeft = imgPosition.mLeft + (imgPosition.mWidth - imgWidth) / 2;
+	imgPosition.mTop = imgPosition.mTop + (imgPosition.mHeight - imgHeight) / 2;
+	imgPosition.mWidth = imgWidth;
+	imgPosition.mHeight = imgHeight;
+	mTextView_picPtr->setPosition(imgPosition);
+	mTextView_picPtr->setBackgroundPic(pFileName);
+
+	mTextView_picPtr->setVisible(true);
+	printf("Leave StartDisplayImage\n");
+}
+
+static void StopDisplayImage()
+{
+	printf("Enter StopDisplayImage\n");
+	ImagePlayer_Deinit(g_pstImagePlayer);
+	StopPlayAudio();
+
+	mTextView_picPtr->setVisible(false);
+	mTextview_curtimePtr->setText("00:00:00");
+	mSeekbar_progressPtr->setProgress(0);
+
+	printf("Leave StopDisplayImage\n");
+}
+
+static void TogglePlayImageFile()
+{
+	ImagePlayer_TogglePause(g_pstImagePlayer);
+}
+
+static void StopPlayFile()
+{
+	if (g_playStream)
+		StopPlayStreamFile();
+	else
+		StopDisplayImage();
+}
+
+static void StartPlayFile(char *pFileName)
+{
+	g_bPlayCompleted = false;
+	g_playStream = IsMediaStreamFile(pFileName);
+
+	if (g_playStream)
+		StartPlayStreamFile(pFileName);
+	else
+		StartDisplayImage(pFileName);
+
+	g_bPlaying = TRUE;
+	g_bPause   = FALSE;
+
+	char filePath[256];
+	char *p = NULL;
+	memset(filePath, 0, sizeof(filePath));
+	strcpy(filePath, pFileName);
+	p = strrchr(filePath, '/');
+	*p = 0;
+	mTextview_fileNamePtr->setText(pFileName+strlen(filePath)+1);
+	SetPlayingStatus(true);
+	//AutoDisplayToolbar();
+}
+
+static void TogglePlayFile()
+{
+	if (g_bPlaying)
+	{
+		g_bPause = !g_bPause;
+		SetPlayingStatus(!g_bPause);
+
+		if (g_playStream)
+			TogglePlayStreamFile();
+		else
+			TogglePlayImageFile();
+	}
+}
+
+static void PlayNextFile()
+{
+	pthread_mutex_lock(&g_playFileMutex);
+	g_eSkipMode = SKIP_NEXT;
+	pthread_mutex_unlock(&g_playFileMutex);
+}
+
+static void PlayPrevFile()
+{
+	pthread_mutex_lock(&g_playFileMutex);
+	g_eSkipMode = SKIP_PREV;
+	pthread_mutex_unlock(&g_playFileMutex);
+}
+
+RepeatMode_e operator++(RepeatMode_e& cmd)
+{
+	RepeatMode_e t = cmd;
+	cmd = static_cast<RepeatMode_e>(cmd+1);
+	return t;
+}
+
+static void PollRepeatMode()
+{
+	RepeatMode_e eRepeatMode = FILE_REPEAT_MODE;
+	pthread_mutex_unlock(&g_playFileMutex);
+	if (g_eRepeatMode < LIST_REPEAT_MODE)
+		g_eRepeatMode++;
+	else
+		g_eRepeatMode = FILE_REPEAT_MODE;
+
+	eRepeatMode = g_eRepeatMode;
+	pthread_mutex_unlock(&g_playFileMutex);
+
+	switch (eRepeatMode)
+	{
+	case FILE_REPEAT_MODE:
+		mButton_circlemodePtr->setBackgroundPic("player/singlerepeat.png");
+		break;
+	case LIST_REPEAT_MODE:
+		mButton_circlemodePtr->setBackgroundPic("player/listrepeat.png");
+		break;
+	default:
+		printf("invalid repeat mode, mode=%d\n", (int)eRepeatMode);
+		break;
+	}
+}
+
+static void *PlayFileProc(void *pData)
+{
+	char *pFileName = (char*)pData;
+	char curFileName[256] = {0};
+	SkipMode_e eSkipMode = NO_SKIP;
+	bool bPlayCompleted = false;
+	bool bPlayError = false;
+
+	strncpy(curFileName, pFileName, sizeof(curFileName));
+	RepeatMode_e eRepeatMode = LIST_REPEAT_MODE;
+	StartPlayFile(curFileName);
+	AutoDisplayToolbar();
+
+	while (!g_bPlayFileThreadExit)
+	{
+		pthread_mutex_lock(&g_playFileMutex);
+		eRepeatMode = g_eRepeatMode;
+		if (eSkipMode != g_eSkipMode)
+		{
+			eSkipMode = g_eSkipMode;
+			g_eSkipMode = NO_SKIP;
+		}
+		if (bPlayError != g_bPlayError)
+		{
+			bPlayError = g_bPlayError;
+			g_bPlayError = false;
+		}
+		if (bPlayCompleted != g_bPlayCompleted)
+		{
+			bPlayCompleted = g_bPlayCompleted;
+			g_bPlayCompleted = false;
+		}
+		pthread_mutex_unlock(&g_playFileMutex);
+
+		if (bPlayError)
+		{
+			printf("occur error when playing file\n");
+			break;
+		}
+
+		if (bPlayCompleted)
+		{
+			if (eRepeatMode == LIST_REPEAT_MODE)
+			{
+				char nextFileName[256] = {0};
+				GetNextFile(curFileName, nextFileName, sizeof(nextFileName));
+				memset(curFileName, 0, sizeof(curFileName));
+				strncpy(curFileName, nextFileName, sizeof(curFileName));
+			}
+
+			StopPlayFile();
+			StartPlayFile(curFileName);
+		}
+		else
+		{
+			if (eSkipMode == SKIP_NEXT)
+			{
+				char nextFileName[256] = {0};
+				GetNextFile(curFileName, nextFileName, sizeof(nextFileName));
+				if (strcmp(curFileName, nextFileName))	// if only one file, not change
+				{
+					memset(curFileName, 0, sizeof(curFileName));
+					strncpy(curFileName, nextFileName, sizeof(curFileName));
+					StopPlayFile();
+					StartPlayFile(curFileName);
+				}
+			}
+			else if (eSkipMode == SKIP_PREV)
+			{
+				char prevFileName[256] = {0};
+				GetPrevFile(curFileName, prevFileName, sizeof(prevFileName));
+				if (strcmp(curFileName, prevFileName))	// if only one file, not change
+				{
+					memset(curFileName, 0, sizeof(curFileName));
+					strncpy(curFileName, prevFileName, sizeof(curFileName));
+					StopPlayFile();
+					StartPlayFile(curFileName);
+				}
+			}
+		}
+
+		usleep(100000);
+	}
+
+	StopPlayFile();
+	g_fileName = curFileName;
+
+	return NULL;
 }
 
 #endif
@@ -719,11 +1111,14 @@ static void onUI_init(){
 	g_playViewHeight = ALIGN_DOWN(layoutPos.mHeight * PANEL_MAX_HEIGHT / UI_MAX_HEIGHT, 2);
 	printf("play view size: w=%d, h=%d\n", g_playViewWidth, g_playViewHeight);
 
+	SSTAR_RegisterUsbListener(DetectUsbHotplug);
 	// init pts
 	g_firstPlayPos = PLAY_INIT_POS;
 
 	// divp use window max width & height default, when play file, the inputAttr of divp will be set refer to file size.
 	CreatePlayerDev();
+
+	pthread_mutex_init(&g_playFileMutex, NULL);		// playFile mutex init
 #endif
 }
 
@@ -733,49 +1128,10 @@ static void onUI_init(){
 static void onUI_intent(const Intent *intentPtr) {
     if (intentPtr != NULL) {
 #ifdef SUPPORT_PLAYER_MODULE
-    fileName = intentPtr->getExtra("filepath");
+    g_fileName = intentPtr->getExtra("filepath");
 
-    mWindow_errMsgPtr->setVisible(false);
-    // init player
-    ResetSpeedMode();
-    StartPlayVideo();
-    StartPlayAudio();
-
-    g_pstPlayStat = player_init(fileName.c_str());
-    if (!g_pstPlayStat)
-    {
-        StopPlayAudio();
-        StopPlayVideo();
-        printf("Initilize player failed!\n");
-        return;
-    }
-    g_pstPlayStat->out_width  = g_playViewWidth;
-    g_pstPlayStat->out_height = g_playViewHeight;
-    printf("video file name is : %s\n", g_pstPlayStat->filename);
-
-    // sendmessage to play file
-    g_bPlaying = TRUE;
-    g_bPause   = FALSE;
-
-    SetPlayerControlCallBack(g_pstPlayStat);
-    printf("open_demux\n");
-    open_demux(g_pstPlayStat);
-    printf("open_video\n");
-    open_video(g_pstPlayStat);
-    printf("open_audio\n");
-    open_audio(g_pstPlayStat);
-    SetPlayingStatus(true);
-    SetPlayerVolumn(g_s32VolValue);
-
-    char filePath[256];
-    char *p = NULL;
-    memset(filePath, 0, sizeof(filePath));
-    strcpy(filePath, fileName.c_str());
-    p = strrchr(filePath, '/');
-    *p = 0;
-    mTextview_fileNamePtr->setText(fileName.c_str()+strlen(filePath)+1);
-
-    AutoDisplayToolbar();
+    g_bPlayFileThreadExit = false;
+    pthread_create(&g_playFileThread, NULL, PlayFileProc, g_fileName.c_str());
 #endif
     }
 }
@@ -800,9 +1156,13 @@ static void onUI_hide() {
 static void onUI_quit() {
 	printf("destroy player dev\n");
 #ifdef SUPPORT_PLAYER_MODULE
+	pthread_mutex_destroy(&g_playFileMutex);
 	DestroyPlayerDev();
-
 	g_firstPlayPos = PLAY_INIT_POS;
+
+	printf("start to UnRegisterUsbListener\n");
+	SSTAR_UnRegisterUsbListener(DetectUsbHotplug);
+	printf("end of UnRegisterUsbListener\n");
 #endif
 }
 
@@ -941,22 +1301,45 @@ static void onProgressChanged_Seekbar_progress(ZKSeekBar *pSeekBar, int progress
 static void onStartTrackingTouch_Seekbar_progress(ZKSeekBar *pSeekBar) {
     //LOGD(" ProgressChanged Seekbar_progress %d !!!\n", progress);
 #ifdef SUPPORT_PLAYER_MODULE
-	if (!g_bPause)
-		toggle_pause(g_pstPlayStat);
+
+	printf("onStartTrackingTouch_Seekbar_progress\n");
+	if (g_playStream)
+	{
+		if (!g_bPause)
+			toggle_pause(g_pstPlayStat);
+	}
+	else
+	{
+		if (!g_bPause)
+			ImagePlayer_TogglePause(g_pstImagePlayer);
+	}
 #endif
 }
 
 static void onStopTrackingTouch_Seekbar_progress(ZKSeekBar *pSeekBar) {
     //LOGD(" ProgressChanged Seekbar_progress %d !!!\n", progress);
 #ifdef SUPPORT_PLAYER_MODULE
+	printf("onStopTrackingTouch_Seekbar_progress\n");
+
 	int progress = pSeekBar->getProgress();
 	long long curPos = progress * g_duration / mSeekbar_progressPtr->getMax();
 	printf("progress value is %d, max value is %d, duration is %lld, curPos is %lld\n", progress, mSeekbar_progressPtr->getMax(),
 			g_duration, curPos);
-	stream_seek(g_pstPlayStat, curPos, (curPos - g_lastpos), 0);
 
-    if (!g_bPause)
-		toggle_pause(g_pstPlayStat);
+	if (g_playStream)
+	{
+		//stream_seek(g_pstPlayStat, curPos, (curPos - g_lastpos), 0);
+		stream_seek(g_pstPlayStat, curPos, 0, 0);		// fot test
+		if (!g_bPause)
+			toggle_pause(g_pstPlayStat);
+	}
+	else
+	{
+		printf("UI: image seek pos is %lld\n", curPos);
+		ImagePlayer_Seek(g_pstImagePlayer, curPos);
+		if (!g_bPause)
+			ImagePlayer_TogglePause(g_pstImagePlayer);
+	}
 #endif
 }
 
@@ -967,12 +1350,7 @@ static bool onButtonClick_sys_back(ZKButton *pButton) {
 static bool onButtonClick_Button_play(ZKButton *pButton) {
     //LOGD(" ButtonClick Button_play !!!\n");
 #ifdef SUPPORT_PLAYER_MODULE
-	if (g_bPlaying)
-	{
-		g_bPause = !g_bPause;
-		toggle_pause(g_pstPlayStat);
-		SetPlayingStatus(!g_bPause);
-	}
+	TogglePlayFile();
 #endif
     return false;
 }
@@ -980,18 +1358,18 @@ static bool onButtonClick_Button_play(ZKButton *pButton) {
 static bool onButtonClick_Button_stop(ZKButton *pButton) {
     //LOGD(" ButtonClick Button_stop !!!\n");
 #ifdef SUPPORT_PLAYER_MODULE
-	g_bPlaying = FALSE;
-	g_bPause = FALSE;
+	if (g_hideToolbarThread.isRunning())
+	{
+		printf("stop hideToolBarthread\n");
+		g_hideToolbarThread.requestExitAndWait();
+	}
 
-	// sendmessage to stop playing
-	player_deinit(g_pstPlayStat);
-	StopPlayAudio();
-	StopPlayVideo();
-
-	SetPlayingStatus(false);
-	ResetSpeedMode();
-	mTextview_speedPtr->setText("");
-	g_bShowPlayToolBar = FALSE;
+	g_bPlayFileThreadExit = true;
+	if (g_playFileThread)
+	{
+		pthread_join(g_playFileThread, NULL);
+		g_playFileThread = NULL;
+	}
 
 	EASYUICONTEXT->goBack();
 #endif
@@ -1002,6 +1380,9 @@ static bool onButtonClick_Button_slow(ZKButton *pButton) {
     //LOGD(" ButtonClick Button_slow !!!\n");
 #ifdef SUPPORT_PLAYER_MODULE
 	char speedMode[16] = {0};
+
+	if (!g_playStream)
+		return false;
 
 	if (g_bPlaying)
 	{
@@ -1081,6 +1462,9 @@ static bool onButtonClick_Button_fast(ZKButton *pButton) {
     //LOGD(" ButtonClick Button_fast !!!\n");
 #ifdef SUPPORT_PLAYER_MODULE
 	char speedMode[16] = {0};
+
+	if (!g_playStream)
+		return false;
 
 	if (g_bPlaying)
 	{
@@ -1188,7 +1572,32 @@ static void onProgressChanged_Seekbar_volumn(ZKSeekBar *pSeekBar, int progress) 
 }
 static bool onButtonClick_Button_confirm(ZKButton *pButton) {
     //LOGD(" ButtonClick Button_confirm !!!\n");
+#ifdef SUPPORT_PLAYER_MODULE
 	mWindow_errMsgPtr->setVisible(false);
 	EASYUICONTEXT->goBack();
+#endif
+    return false;
+}
+static bool onButtonClick_Button_prev(ZKButton *pButton) {
+    LOGD(" ButtonClick Button_prev !!!\n");
+#ifdef SUPPORT_PLAYER_MODULE
+    PlayPrevFile();
+#endif
+    return false;
+}
+
+static bool onButtonClick_Button_next(ZKButton *pButton) {
+    LOGD(" ButtonClick Button_next !!!\n");
+#ifdef SUPPORT_PLAYER_MODULE
+    PlayNextFile();
+#endif
+    return false;
+}
+
+static bool onButtonClick_Button_circlemode(ZKButton *pButton) {
+    LOGD(" ButtonClick Button_circlemode !!!\n");
+#ifdef SUPPORT_PLAYER_MODULE
+    PollRepeatMode();
+#endif
     return false;
 }

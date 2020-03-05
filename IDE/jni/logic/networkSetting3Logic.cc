@@ -30,67 +30,9 @@
 * 在Eclipse编辑器中  使用 “alt + /”  快捷键可以打开智能提示
 */
 #ifdef SUPPORT_WLAN_MODULE
-#include "mi_common_datatype.h"
-#include "mi_wlan.h"
-#include "wifiInfo.h"
+#include "hotplugdetect.h"
 
-
-static MI_WLAN_ConnectParam_t stConnectInfo;
-static MI_WLAN_Status_t status;
-static WLAN_HANDLE g_connHdl = -1;		// record connect handle, if connect success, save it to config
-
-class WifiChangeConnThread : public Thread {
-public:
-	void setCycleCnt(int cnt, int sleepMs) { nCycleCnt = cnt; nSleepMs = sleepMs; }
-
-protected:
-	virtual bool threadLoop() {
-		if (nCycleCnt-- > 0)
-		{
-			MI_WLAN_GetStatus(&status);
-
-			if(status.stStaStatus.state == WPA_COMPLETED)
-			{
-				Wifi_ConnectInfo_t stConn;
-				checkSsidExist((char*)status.stStaStatus.ssid, &stConn);
-				memset(stConn.passwd, 0, sizeof(stConn.passwd));
-				strcpy(stConn.passwd, (char*)stConnectInfo.au8Password);
-
-				printf("wifi connect success: %s %s\n", status.stStaStatus.ip_address, status.stStaStatus.ssid);
-				setConnectionStatus(true);
-
-				// update current ssid & ssid's info, 更新当前ssid和ssid的连接信息
-				if (stConn.index == -1)
-				{
-					stConn.index = g_connHdl;
-					addSsidToApList((char*)status.stStaStatus.ssid);
-					addSsidInfoToConnList((char*)status.stStaStatus.ssid, &stConn);
-				}
-
-				updateCurSsid((char*)status.stStaStatus.ssid);
-				saveWifiConfig();
-				setWlanHandle(g_connHdl);
-				saveConnectParam(&stConnectInfo);
-
-				return false;
-			}
-
-			if (!nCycleCnt)
-				printf("wifi connect failed\n");
-
-			sleep(nSleepMs);
-			return true;
-		}
-
-		return false;
-	}
-
-private:
-	int nCycleCnt;
-	int nSleepMs;
-};
-
-static WifiChangeConnThread wifiConnectThread;
+static MI_WLAN_ConnectParam_t g_stConnectInfo;
 #endif
 /**
  * 注册定时器
@@ -119,10 +61,10 @@ static void onUI_intent(const Intent *intentPtr) {
     	std::string ssid = intentPtr->getExtra("ssid");
     	mTextview_connect_ssidPtr->setText(ssid);
 
-    	memset(&stConnectInfo, 0, sizeof(MI_WLAN_ConnectParam_t));
-    	stConnectInfo.eSecurity = E_MI_WLAN_SECURITY_WPA;
-    	stConnectInfo.OverTimeMs = 5000;
-    	memcpy(stConnectInfo.au8SSId, ssid.c_str(), strlen(ssid.c_str()));
+    	memset(&g_stConnectInfo, 0, sizeof(MI_WLAN_ConnectParam_t));
+    	g_stConnectInfo.eSecurity = E_MI_WLAN_SECURITY_WPA;
+    	g_stConnectInfo.OverTimeMs = 5000;
+    	memcpy(g_stConnectInfo.au8SSId, ssid.c_str(), strlen(ssid.c_str()));
     }
 #endif
 }
@@ -205,8 +147,8 @@ static bool onButtonClick_sys_back(ZKButton *pButton) {
 static void onEditTextChanged_EdittextAllInfo(const std::string &text) {
     //LOGD(" onEditTextChanged_ EdittextAllInfo %s !!!\n", text.c_str());
 #ifdef SUPPORT_WLAN_MODULE
-	memset(stConnectInfo.au8Password, 0, sizeof(stConnectInfo.au8Password));
-	memcpy(stConnectInfo.au8Password, text.c_str(), strlen(text.c_str()));
+	memset(g_stConnectInfo.au8Password, 0, sizeof(g_stConnectInfo.au8Password));
+	memcpy(g_stConnectInfo.au8Password, text.c_str(), strlen(text.c_str()));
 #endif
 }
 
@@ -218,23 +160,12 @@ static bool onButtonClick_Buttonbg(ZKButton *pButton) {
 static bool onButtonClick_Button_connect_conn(ZKButton *pButton) {
     //LOGD(" ButtonClick Button_connect_conn !!!\n");
 #ifdef SUPPORT_WLAN_MODULE
-	// check if ssid exist, if exist, get handle, else handle is -1
-	Wifi_ConnectInfo_t stConnInfo;
-	checkSsidExist((char*)stConnectInfo.au8SSId, &stConnInfo);
-	g_connHdl = stConnInfo.index;
-	if (g_connHdl != -1)	// if ssid is exist, update connect info
-	{
-		updateConnPasswd((char*)stConnectInfo.au8SSId, (char*)stConnectInfo.au8Password);
-		saveWifiConfig();
-	}
-
-	setConnectionStatus(false);
-	MI_WLAN_Connect(&g_connHdl, &stConnectInfo);	// wpa only save successful connection, wifisetting.json is also
-	printf("current wlan handle is %d\n", g_connHdl);
-
-	wifiConnectThread.setCycleCnt(20, 500);
-	wifiConnectThread.run();
+	printf("connect wifi...\n");
+	SSTAR_DisconnectWifi();
+	SSTAR_ConnectWifi(&g_stConnectInfo);
+	printf("connect wifi done\n");
 	EASYUICONTEXT->closeActivity("networkSetting3Activity");
+	printf("close net3\n");
 #endif
     return false;
 }

@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include "manager/LanguageManager.h"
+#include "statusbarconfig.h"
 
 typedef struct {
     const char* name;
@@ -54,11 +55,10 @@ static S_ACTIVITY_TIMEER REGISTER_ACTIVITY_TIMER_TAB[] = {
 
 static void onUI_init(){
     //Tips :添加 UI初始化的显示代码到这里,如:mText1->setText("123");
-	EASYUICONTEXT->hideStatusBar();
 }
 
 static void onUI_quit() {
-//	EASYUICONTEXT->showStatusBar();
+	ShowStatusBar(1, 0, 0);
 }
 
 static void onProtocolDataUpdate(const SProtocolData &data) {

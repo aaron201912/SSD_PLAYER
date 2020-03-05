@@ -26,6 +26,10 @@
 #include "window/ZKSlideWindow.h"
 
 /*TAG:Macro宏ID*/
+#define ID_PLAYER_TextView_pic    50001
+#define ID_PLAYER_Button_circlemode    20009
+#define ID_PLAYER_Button_next    20008
+#define ID_PLAYER_Button_prev    20007
 #define ID_PLAYER_Window_mediaInfo    110003
 #define ID_PLAYER_Window_playBar    110002
 #define ID_PLAYER_Button_confirm    20006

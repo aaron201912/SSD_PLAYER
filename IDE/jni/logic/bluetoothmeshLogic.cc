@@ -34,6 +34,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
+#include "statusbarconfig.h"
 
 /**
  * 注册定时器
@@ -369,6 +370,7 @@ static void onUI_hide() {
  */
 static void onUI_quit() {
 	BL_MESH_Deinit();
+	ShowStatusBar(1, 0, 0);
 }
 
 /**

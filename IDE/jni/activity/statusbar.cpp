@@ -2,6 +2,9 @@
 #include "entry/EasyUIContext.h"
 
 /*TAG:GlobalVariable全局变量*/
+static ZKTextView* mTextView_usbStatusPtr;
+static ZKTextView* mTextView_wifiStatusPtr;
+static ZKTextView* mTextView_wiredNetStatusPtr;
 static ZKButton* msys_homePtr;
 static ZKDigitalClock* mDigitalclock1Ptr;
 static ZKButton* msys_backPtr;
@@ -121,6 +124,9 @@ const char* statusbar::getAppName() const{
 //TAG:onCreate
 void statusbar::onCreate() {
 	BaseApp::onCreate();
+    mTextView_usbStatusPtr = (ZKTextView*)findControlByID(ID_STATUSBAR_TextView_usbStatus);
+    mTextView_wifiStatusPtr = (ZKTextView*)findControlByID(ID_STATUSBAR_TextView_wifiStatus);
+    mTextView_wiredNetStatusPtr = (ZKTextView*)findControlByID(ID_STATUSBAR_TextView_wiredNetStatus);
     msys_homePtr = (ZKButton*)findControlByID(ID_STATUSBAR_sys_home);
     mDigitalclock1Ptr = (ZKDigitalClock*)findControlByID(ID_STATUSBAR_Digitalclock1);
     msys_backPtr = (ZKButton*)findControlByID(ID_STATUSBAR_sys_back);

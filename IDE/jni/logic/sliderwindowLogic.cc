@@ -29,6 +29,7 @@
 
 
 #include "utils/TimeHelper.h"
+#include "statusbarconfig.h"
 
 static void updateUI_time(){
 	char timeStr[20];
@@ -46,15 +47,15 @@ static void updateUI_time(){
 static void onUI_init(){
     //Tips :添加 UI初始化的显示代码到这里,如:mText1->setText("123");
 	updateUI_time();
-	EASYUICONTEXT->showStatusBar();
 }
 
 static void onUI_show() {
-	EASYUICONTEXT->showStatusBar();
+	ShowStatusBar(1, 1, 1);
 }
 
 static void onUI_quit() {
-	EASYUICONTEXT->hideStatusBar();
+	ShowStatusBar(1, 0, 0);
+	printf("%s quit, disable returnKey\n", __FILE__);
 }
 
 static bool onUI_Timer(int id){

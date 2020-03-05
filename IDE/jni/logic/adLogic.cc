@@ -36,6 +36,7 @@
 #include "os/SystemProperties.h"
 #include "os/UpgradeMonitor.h"
 #include "base_types.h"
+#include "statusbarconfig.h"
 
 extern "C"{
 #include "voicedetect.h"
@@ -140,6 +141,7 @@ static void onUI_quit() {
 	printf("onUi quit\n");
 	SSTAR_VoiceDetectStop();
 	SSTAR_VoiceDetectDeinit(g_hDSpotter);
+	ShowStatusBar(1, 0, 0);
 }
 
 

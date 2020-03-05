@@ -36,8 +36,8 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <algorithm>
-#include "usbdetect.h"
-
+#include "hotplugdetect.h"
+#include "statusbarconfig.h"
 
 #define DIR_TYPE        "文件夹"
 #define FILE_TYPE       "文件"
@@ -90,6 +90,9 @@ typedef enum _FileFilter_e
 	OGM_FILTER,
 	TRP_FILTER,
 	TP_FILTER,
+	PNG_FILTER,
+//	BMP_FILTER,
+	JPG_FILTER,
 	FILE_FILTER_NUM
 } FileFilter_e;
 
@@ -127,7 +130,10 @@ static char *g_pFileFilter[FILE_FILTER_NUM] = {
 		".divx",
 		".ogm",
 		".trp",
-		".tp"
+		".tp",
+		"png",
+//		"bmp",
+		"jpg"
 };
 
 char *getDayOfWeek(int day)
@@ -492,6 +498,95 @@ void ShowCurrentDir(FileTree_t *pRoot, std::vector<FileChildInfo_t>* pChildInfo)
 	mListview_playlistPtr->refreshListView();
 }
 
+void GetPrevFile(char *pCurFileFullName, char *pPrevFileFullName, int prevFilePathLen)
+{
+	char tmpPath[256];
+	int i = 0;
+	int findCurFile = 0;
+
+	for (i = 0; i < sFileChildren.size(); i++)
+	{
+		FileChildInfo_t &childInfo = sFileChildren.at(i);
+		memset(tmpPath, 0, sizeof(tmpPath));
+		sprintf(tmpPath, "%s/%s", g_curDir, childInfo.name);
+
+		if (!strcmp(tmpPath, pCurFileFullName))
+		{
+			findCurFile = 1;
+			break;
+		}
+	}
+
+	while (findCurFile)
+	{
+		i = (--i + sFileChildren.size()) % sFileChildren.size();
+		FileChildInfo_t &childInfo = sFileChildren.at(i);
+
+		if (!childInfo.dirFlag)
+		{
+			memset(pPrevFileFullName, 0, prevFilePathLen);
+			sprintf(pPrevFileFullName, "%s/%s", g_curDir, childInfo.name);
+			break;
+		}
+	}
+}
+
+void GetNextFile(char *pCurFileFullName, char *pNextFileFullName, int nextFilePathLen)
+{
+	char tmpPath[256];
+	int i = 0;
+	int findCurFile = 0;
+
+	for (i = 0; i < sFileChildren.size(); i++)
+	{
+		FileChildInfo_t &childInfo = sFileChildren.at(i);
+		memset(tmpPath, 0, sizeof(tmpPath));
+		sprintf(tmpPath, "%s/%s", g_curDir, childInfo.name);
+
+		if (!strcmp(tmpPath, pCurFileFullName))
+		{
+			findCurFile = 1;
+			break;
+		}
+	}
+
+	while (findCurFile)
+	{
+		i = (++i + sFileChildren.size()) % sFileChildren.size();
+		FileChildInfo_t &childInfo = sFileChildren.at(i);
+
+		if (!childInfo.dirFlag)
+		{
+			memset(pNextFileFullName, 0, nextFilePathLen);
+			sprintf(pNextFileFullName, "%s/%s", g_curDir, childInfo.name);
+			break;
+		}
+	}
+}
+
+int IsMediaStreamFile(char *pCurFileFullName)		// judge if it's audio/video file or picture file
+{
+	int fileNameLen = strlen(pCurFileFullName);
+
+	for(int i = PNG_FILTER; i < FILE_FILTER_NUM; i++)
+	{
+		int filterLen = strlen(g_pFileFilter[i]);
+
+		if (fileNameLen > filterLen)
+		{
+			if (!strncmp(pCurFileFullName+(fileNameLen-filterLen), g_pFileFilter[i], filterLen))
+				return 0;
+		}
+	}
+
+	return 1;
+}
+
+void DetectUsbStatus(UsbParam_t *pstUsbParam)		// action 0, connect; action 1, disconnect
+{
+	if (!pstUsbParam->action)
+		EASYUICONTEXT->goHome();
+}
 #endif
 
 /**
@@ -523,7 +618,7 @@ static void onUI_intent(const Intent *intentPtr) {
     FileTree_t *pos = NULL;
     // init usb dev
 
-    if (0 != SSTAR_InitUsbDev((char*)g_udiskPath, sizeof(g_udiskPath)))
+    if (!SSTAR_GetUsbCurrentStatus())
 	{
     	mTextview_tipsPtr->setVisible(true);
     	mButton_updirPtr->setVisible(false);
@@ -535,6 +630,9 @@ static void onUI_intent(const Intent *intentPtr) {
 	}
     else
     {
+    	SSTAR_GetUsbPath((char*)g_udiskPath, sizeof(g_udiskPath));
+    	SSTAR_RegisterUsbListener(DetectUsbStatus);
+
     	mTextview_tipsPtr->setVisible(false);
     	mTextview_playlist_titlePtr->setVisible(true);
 		mListview_playlistPtr->setVisible(true);
@@ -587,8 +685,10 @@ static void onUI_quit() {
 #ifdef SUPPORT_PLAYER_MODULE
 	DestroyFileTree(g_pFileRoot);
 	g_pFileRoot = NULL;
-	SSTAR_DeinitUsbDev();
+	SSTAR_UnRegisterUsbListener(DetectUsbStatus);
 #endif
+
+	ShowStatusBar(1, 0, 0);
 }
 
 /**
