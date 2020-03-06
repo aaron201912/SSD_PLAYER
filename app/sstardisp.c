@@ -114,11 +114,20 @@ int sstar_disp_init(MI_DISP_PubAttr_t *pstDispPubAttr)
         MI_DISP_SetPubAttr(0, pstDispPubAttr);
         MI_DISP_Enable(0);
         MI_DISP_BindVideoLayer(0, 0);
+		memset(&stLayerAttr, 0, sizeof(stLayerAttr));
+        stLayerAttr.stVidLayerSize.u16Width  = LOCAL_VIDEO_W;
+        stLayerAttr.stVidLayerSize.u16Height = LOCAL_VIDEO_H;
+        stLayerAttr.ePixFormat = E_MI_SYS_PIXEL_FRAME_YUV_MST_420;
+        stLayerAttr.stVidLayerDispWin.u16X      = 0;
+        stLayerAttr.stVidLayerDispWin.u16Y      = 0;
+        stLayerAttr.stVidLayerDispWin.u16Width  = LOCAL_VIDEO_W;
+        stLayerAttr.stVidLayerDispWin.u16Height = LOCAL_VIDEO_H;
+        MI_DISP_SetVideoLayerAttr(0, &stLayerAttr);
         MI_DISP_EnableVideoLayer(0);
 
         MI_DISP_SetInputPortAttr(0, 0, &stInputPortAttr);
         MI_DISP_EnableInputPort(0, 0);
-        MI_DISP_SetInputPortSyncMode(0, 0, E_MI_DISP_SYNC_MODE_FREE_RUN);
+        MI_DISP_SetInputPortSyncMode(0, 0, E_MI_DISP_SYNC_MODE_FREE_RUN);	
     }
     else if (E_MI_DISP_INTF_HDMI == pstDispPubAttr->eIntfType)
     {

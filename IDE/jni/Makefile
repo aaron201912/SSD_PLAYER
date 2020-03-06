@@ -64,6 +64,7 @@ INCLUDE_DIR += -I ../jni/v4l2/inc -I ../jni/v4l2/inc/uvc -I ../jni/v4l2/inc/vide
                -I ../jni/v4l2/src/libv4l -I ../jni/v4l2/src/processing
 INCLUDE_DIR += -I ../jni/hotplugdetect -I ../jni/hotplugdetect/common -I ../jni/hotplugdetect/usbdetect -I ../jni/hotplugdetect/wifidetect \
 			   -I ../jni/hotplugdetect/wirednetworkdetect
+INCLUDE_DIR += -I ../jni/airplay/include
 
 ifneq ($(CONFIG_WLAN_SWITCH),)
 CFLAGS+=-DSUPPORT_WLAN_MODULE
