@@ -50,6 +50,8 @@ int Ss_AO_Deinit(void)
     /* disable ao device */
     ExecFunc(MI_AO_Disable(AoDevId), MI_SUCCESS);
 
+    return 0;
+
 }
 int Ss_AO_Init(void)
 {
