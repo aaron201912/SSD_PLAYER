@@ -6,7 +6,7 @@ TARGET = zkgui
 PROJECT_PATH = ../IDE/jni/sdkdir
 
 MINIGUI_PATH=./minigui_dir
-
+ENABLE_HDMI = 0
 COMPILE_ROOT := $(shell pwd)
 CC = arm-linux-gnueabihf-g++
 STRIP = arm-linux-gnueabihf-strip
@@ -16,7 +16,12 @@ LDFLAGS = -L$(MINIGUI_PATH)/lib -L$(PROJECT_PATH)/lib
 CONFIG_PREFIX =.
 
 LOCAL_CFLAGS =
+
+ifeq ($(ENABLE_HDMI), 1)
 LOCAL_LDFLAGS = -leasyui -lminigui_zk -lmgplus_zk -lpng12 -ljpeg -lpthread -lfreetype -ldl -lts -lz -lmi_common -lmi_gfx -lmi_sys -lmi_disp -lmi_panel -lmi_vdec -lmi_ao -lmi_ai -lDSpotter -lCReader -lmi_hdmi -Wl,--hash-style=gnu
+else
+LOCAL_LDFLAGS = -leasyui -lminigui_zk -lmgplus_zk -lpng12 -ljpeg -lpthread -lfreetype -ldl -lts -lz -lmi_common -lmi_gfx -lmi_sys -lmi_disp -lmi_panel -lmi_vdec -lmi_ao -lmi_ai -lDSpotter -lCReader -Wl,--hash-style=gnu
+endif
 
 CPPSRCS += ${wildcard *.cpp}
 CPPOBJS = $(patsubst %.cpp, %.cpp.o, $(CPPSRCS))
@@ -30,10 +35,10 @@ $(TARGET):$(CPPOBJS) $(COBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(LOCAL_CFLAGS) $(LOCAL_LDFLAGS) -o $@ $^
 
 $(CPPOBJS):%.cpp.o:%.cpp
-	$(CC) $(CFLAGS) $(LDFLAGS) $(LOCAL_CFLAGS) $(LOCAL_LDFLAGS) -c $^ -o $@
+	$(CC) -DENABLE_HDMI=$(ENABLE_HDMI) $(CFLAGS) $(LDFLAGS) $(LOCAL_CFLAGS) $(LOCAL_LDFLAGS) -c $^ -o $@
 
 $(COBJS):%.c.o:%.c
-	$(CC) $(CFLAGS) $(LDFLAGS) $(LOCAL_CFLAGS) $(LOCAL_LDFLAGS) -c $^ -o $@
+	$(CC) -DENABLE_HDMI=$(ENABLE_HDMI) $(CFLAGS) $(LDFLAGS) $(LOCAL_CFLAGS) $(LOCAL_LDFLAGS) -c $^ -o $@
 
 install: 
 	-mkdir -p $(CONFIG_PREFIX)/bin

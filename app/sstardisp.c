@@ -9,8 +9,9 @@
 #include "mi_panel.h"
 #include "mi_disp_datatype.h"
 #include "mi_disp.h"
+#if ENABLE_HDMI
 #include "mi_hdmi.h"
-
+#endif
 #define UI_1024_600 1
 #define USE_MIPI    0
 
@@ -50,6 +51,7 @@
 #if defined(__cplusplus)||defined(c_plusplus)
 extern "C"{
 #endif
+#if ENABLE_HDMI
 static MI_S32 Hdmi_callback_impl(MI_HDMI_DeviceId_e eHdmi, MI_HDMI_EventType_e Event, void *pEventParam, void *pUsrParam)
 {
     switch (Event)
@@ -67,14 +69,18 @@ static MI_S32 Hdmi_callback_impl(MI_HDMI_DeviceId_e eHdmi, MI_HDMI_EventType_e E
 
     return MI_SUCCESS;
 }
+#endif
 #define MAKE_YUYV_VALUE(y,u,v) ((y) << 24) | ((u) << 16) | ((y) << 8) | (v)
 #define YUYV_BLACK MAKE_YUYV_VALUE(0,128,128)
+
 int sstar_disp_init(MI_DISP_PubAttr_t *pstDispPubAttr)
 {
     MI_PANEL_LinkType_e eLinkType;
     MI_DISP_InputPortAttr_t stInputPortAttr;
+#if ENABLE_HDMI
     MI_HDMI_InitParam_t stInitParam;
     MI_HDMI_Attr_t stAttr;
+#endif
     MI_DISP_VideoLayerAttr_t stLayerAttr;
 
     memset(&stInputPortAttr, 0, sizeof(stInputPortAttr));
@@ -129,6 +135,7 @@ int sstar_disp_init(MI_DISP_PubAttr_t *pstDispPubAttr)
         MI_DISP_EnableInputPort(0, 0);
         MI_DISP_SetInputPortSyncMode(0, 0, E_MI_DISP_SYNC_MODE_FREE_RUN);	
     }
+#if ENABLE_HDMI
     else if (E_MI_DISP_INTF_HDMI == pstDispPubAttr->eIntfType)
     {
         stInitParam.pCallBackArgs = NULL;
@@ -168,6 +175,7 @@ int sstar_disp_init(MI_DISP_PubAttr_t *pstDispPubAttr)
         MI_DISP_SetVideoLayerAttr(0, &stLayerAttr);
         MI_DISP_EnableVideoLayer(0);
     }
+#endif
     if (pstDispPubAttr->eIntfType == E_MI_DISP_INTF_LCD)
     {
         MI_PANEL_Init(eLinkType);
@@ -190,11 +198,13 @@ int sstar_disp_Deinit(MI_DISP_PubAttr_t *pstDispPubAttr)
     MI_DISP_Disable(0);
 
     switch(pstDispPubAttr->eIntfType) {
+#if ENABLE_HDMI
         case E_MI_DISP_INTF_HDMI:
             MI_HDMI_Stop(E_MI_HDMI_ID_0);
             MI_HDMI_Close(E_MI_HDMI_ID_0);
             MI_HDMI_DeInit();
             break;
+#endif
         case E_MI_DISP_INTF_VGA:
             break;
 
