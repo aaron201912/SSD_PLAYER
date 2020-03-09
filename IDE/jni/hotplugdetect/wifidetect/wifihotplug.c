@@ -42,7 +42,8 @@ typedef struct
 
 static int g_wifiSupported = 1;			// 设备是否支持wifi且MI_WLAN初始化正常
 static int g_wifiEnabled = 0;
-static int g_manuaConnect = 0;			// 手动连接AP
+static int g_manuaConnect = 0;			// 手动连接AP，在用户进行手动连接后会置为1
+static int g_userConnect = 0;			// 用户选择ssid进行连接
 static int g_registerConnChanged = 0;	// 注册callback列表新增或删减
 static WLAN_HANDLE g_hWlan = -1;
 static MI_WLAN_OpenParams_t g_stOpenParam = {E_MI_WLAN_NETWORKTYPE_INFRA};
@@ -106,7 +107,7 @@ static void SaveScanResult(char *curSsid, MI_WLAN_ScanResult_t *pstScanResult)
 			g_stScanResListHead.scanResCnt++;
 
 
-			printf("curSSid=%s, saveSsid=%s, i=%d\n", curSsid, saveSsid, i);
+			//printf("curSSid=%s, saveSsid=%s, i=%d\n", curSsid, saveSsid, i);
 
 			if (!strcmp(curSsid, saveSsid))
 			{
@@ -223,6 +224,7 @@ static void WifiDeinit()
 	saveWifiConfig();
 
 	g_manuaConnect = 0;
+	g_userConnect = 0;
 }
 
 static void *WifiConnectProc(void *pdata)
@@ -231,10 +233,11 @@ static void *WifiConnectProc(void *pdata)
 
     int wifiEnabled = 0;
     int manuaConnect = 0;
-    int connParamChanged = 0;
-    int connSsidChanged = 0;
+    int userConnect = 0;
     int enableStatusChanged = 0;
     int registerListChanged = 0;
+    int newConnect = 0;
+	
     WLAN_HANDLE hWlan = 0;
     MI_WLAN_ConnectParam_t stConnParam;
     MI_WLAN_Status_t stStatus;
@@ -251,9 +254,8 @@ static void *WifiConnectProc(void *pdata)
 		enableStatusChanged = (wifiEnabled != g_wifiEnabled);
 		wifiEnabled = g_wifiEnabled;
 		manuaConnect = g_manuaConnect;			// 是否主动call Connect, netpage3
+		userConnect = g_userConnect;
 		hWlan = g_hWlan;			// 手动连接前，根据连接ssid判断是否已经存在在配置中吗，获取handle，赋值g_hWlan
-		connParamChanged = memcmp(&stConnParam, &g_stConnParam, sizeof(MI_WLAN_ConnectParam_t));
-		connSsidChanged = memcmp(&stConnParam.au8SSId, g_stConnParam.au8SSId, MI_WLAN_MAX_SSID_LEN);
 		memcpy(&stConnParam, &g_stConnParam, sizeof(MI_WLAN_ConnectParam_t));
 		registerListChanged = g_registerConnChanged;
 		g_registerConnChanged = 0;
@@ -261,7 +263,7 @@ static void *WifiConnectProc(void *pdata)
 
 		if (wifiEnabled && (manuaConnect || hWlan != -1))		// wifi使能且是手动连接AP或自动连接配置中已有的AP时，执行一次Connect操作
 		{
-			if (enableStatusChanged || connParamChanged)		// 当wifi由disable变为enable，或是连接参数发生变化时，进行连接
+			if (enableStatusChanged || userConnect)		// 当wifi由disable变为enable，或是有手动连接时，进行连接
 			{
 				MI_WLAN_Connect(&hWlan, &stConnParam);
 				printf("Connect, conn param: id=%d, ssid=%s, passwd=%s\n", hWlan,
@@ -270,7 +272,10 @@ static void *WifiConnectProc(void *pdata)
 				// 若是新的连接，输入handle为-1，执行连接后handle置为当前最大handle+1，与连接是否成功无关
 				pthread_mutex_lock(&g_connParamMutex);
 				g_hWlan = hWlan;
+				g_userConnect = 0;
 				pthread_mutex_unlock(&g_connParamMutex);
+
+				newConnect = 1;
 			}
 
 			MI_WLAN_GetStatus(&stStatus);
@@ -284,7 +289,7 @@ static void *WifiConnectProc(void *pdata)
 
 				checkSsidExist((char*)stStatus.stStaStatus.ssid, &stConn);
 
-				printf("checkSsidExist: ssid=%s, index=%d\n", (char*)stStatus.stStaStatus.ssid, stConn.index);
+				//printf("checkSsidExist: ssid=%s, index=%d\n", (char*)stStatus.stStaStatus.ssid, stConn.index);
 
 				memset(stConn.passwd, 0, sizeof(stConn.passwd));
 				strcpy(stConn.passwd, (char*)stConnParam.au8Password);
@@ -304,8 +309,7 @@ static void *WifiConnectProc(void *pdata)
 				else	// 连接配置中存在的ssid
 				{
 					// 连接的ssid不是上一个ssid，或连接的ssid是上一个ssid但密码发生变化，更新ssid的信息
-					// if (connSsidChanged || (!connSsidChanged && connParamChanged))
-					if (connParamChanged)
+					if (newConnect)
 					{
 						printf("connParam changed: hWlan is %d\n", hWlan);
 						stConn.index = hWlan;
@@ -316,6 +320,8 @@ static void *WifiConnectProc(void *pdata)
 						saveConnectParam(&stConnParam);
 					}
 				}
+
+				newConnect = 0;
 			}
 			else
 				currentConnStatus = 0;
@@ -406,7 +412,7 @@ static void *WifiScanProc(void *pdata)
 			}
 		}
 
-		usleep(1000000);	// 1s扫描一次
+		usleep(3000000);	// 3s扫描一次
     }
 
 	printf("exit thread proc\n");
@@ -610,9 +616,12 @@ void Wifi_Connect(MI_WLAN_ConnectParam_t *pstConnParam)
 	memset(stConn.passwd, 0, sizeof(stConn.passwd));
 	strcpy(stConn.passwd, (char*)pstConnParam->au8Password);
 
+	printf("wifi connect: handle=%d, ssid=%s\n", stConn.index, (char*)pstConnParam->au8SSId);
+
 	pthread_mutex_lock(&g_connParamMutex);
 	g_hWlan = (WLAN_HANDLE)stConn.index;		// 传入hWlan,新ssid为-1,已存在的ssid使用保存的handle
-	g_manuaConnect = 1;
+	g_manuaConnect = 1;							// 仅开机时做自动连接,之后手动选择ssid进行连接
+	g_userConnect = 1;
 	memcpy(&g_stConnParam, pstConnParam, sizeof(MI_WLAN_ConnectParam_t));
 	pthread_mutex_unlock(&g_connParamMutex);
 }

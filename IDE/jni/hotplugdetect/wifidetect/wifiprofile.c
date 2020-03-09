@@ -18,6 +18,7 @@
 #define WIFI_SETTING_CFG	"/appconfigs/wifisetting.json"
 #define WPA_CFG				"/appconfigs/wpa_supplicant.conf"
 #define WPA_CFG_BACKUP		"/appconfigs/wpa_supplicant.conf_bak"
+#define WPA_CFG_PREFIX		"ctrl_interface"
 #define ENABLE_DEBUG		0
 
 #if ENABLE_DEBUG
@@ -34,6 +35,7 @@
 
 static bool g_bWifiSupport = true;		// 设备是否支持wifi,由设备决定，不可更改
 static bool g_bWifiEnable = true;
+static char g_line[256];
 //static bool g_bConnected = false;
 static WLAN_HANDLE g_hWlan = -1;
 static MI_WLAN_ConnectParam_t g_stConnectParam;
@@ -105,6 +107,18 @@ void saveConnectParam(MI_WLAN_ConnectParam_t *pConnParam)
 	memcpy(&g_stConnectParam, pConnParam, sizeof(MI_WLAN_ConnectParam_t));
 }
 
+static char *freadline(FILE *stream)
+{
+    int count = 0;
+
+    while(!feof(stream) && (count < sizeof(g_line)) && ((g_line[count++] = getc(stream)) != '\n'));
+    if (!count)
+        return NULL;
+
+    g_line[count - 1] = '\0';
+
+    return g_line;
+}
 
 // 文件不存在或文件存在但内容为空时，创建文件并写入默认配置;
 // 文件存在且内容不为空时，读取文件内容
@@ -119,16 +133,21 @@ int checkProfile()
 	pCfgFile = fopen(WPA_CFG, "r+");
 	if (pCfgFile)
 	{
-		fseek(pCfgFile, 0, SEEK_END);
-		int fileLen = ftell(pCfgFile);
-		printf("cfg file len is %d\n", fileLen);
-		fseek(pCfgFile, 0, SEEK_SET);
+		// judge file prefix
+		char *pCurLine = NULL;
+		char *pSeek = NULL;
+		int nRet = 0;
 
-		if (fileLen)
+		pCurLine = freadline(pCfgFile);
+		if (pCurLine)
 		{
-			printf("%s is not empty\n", WPA_CFG);
-			fclose(pCfgFile);
-			return 0;
+			pSeek = strstr(pCurLine, WPA_CFG_PREFIX);
+			if (pSeek)
+			{
+				printf("%s is not empty\n", WPA_CFG);
+				fclose(pCfgFile);
+				return 0;
+			}
 		}
 
 		fclose(pCfgFile);

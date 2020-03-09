@@ -113,7 +113,7 @@ const char* IconTab[]={
 		"playlistActivity",
 		"cameraActivity",
 		"rtspActivity",
-		"bluetoothmeshActivity",
+		//"bluetoothmeshActivity",
 		//"cellnetworkActivity",
 		"liveinputActivity",
 		"ttsActivity",

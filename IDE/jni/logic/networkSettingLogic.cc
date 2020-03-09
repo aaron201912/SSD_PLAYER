@@ -94,6 +94,11 @@ void WifiConnStatusCallback(char *pSsid, int status)
 	memset(g_connSsid, 0, sizeof(g_connSsid));
 	memcpy(g_connSsid, pSsid, strlen(pSsid));
 	g_scanResLock.unlock();
+
+	if (mListviewNetworkPtr->isVisible())
+	{
+		mListviewNetworkPtr->refreshListView();
+	}
 }
 
 // 更新wifi信号强度
@@ -150,26 +155,15 @@ static void onUI_init(){
 static void onUI_intent(const Intent *intentPtr) {
 #ifdef SUPPORT_WLAN_MODULE
 	WIFI_LOG("onUI_intent\n");
-#endif
-}
-
-/*
- * 当界面显示时触发
- */
-static void onUI_show() {
-#ifdef SUPPORT_WLAN_MODULE
-	WIFI_LOG("onUI_show\n");
 
 	SSTAR_RegisterWifiStaConnListener(WifiConnStatusCallback);
 	SSTAR_RegisterWifiStaScanListener(WifiSignalSTRStatusCallback);
 
 	WIFI_LOG("register callback done\n");
 
-	//if (getWifiSupportStatus())
 	if (SSTAR_GetWifiSupportStatus())
 	{
 		WIFI_LOG("support wifi\n");
-		//bool bWifiEnable = getWifiEnableStatus();
 		bool bWifiEnable = (bool)SSTAR_GetWifiEnableStatus();
 		mTextviewNotSupportPtr->setVisible(FALSE);
 		mTextviewWifiPtr->setVisible(TRUE);
@@ -203,6 +197,16 @@ static void onUI_show() {
 	g_vecScanResult.clear();
 	g_scanResLock.unlock();
 
+	WIFI_LOG("Leave onUI_intent\n");
+#endif
+}
+
+/*
+ * 当界面显示时触发
+ */
+static void onUI_show() {
+#ifdef SUPPORT_WLAN_MODULE
+	WIFI_LOG("onUI_show\n");
 	WIFI_LOG("Leave onUI_show\n");
 #endif
 }
@@ -213,11 +217,6 @@ static void onUI_show() {
 static void onUI_hide() {
 #ifdef SUPPORT_WLAN_MODULE
 	WIFI_LOG("onUI_hide\n");
-
-	SSTAR_UnRegisterWifiStaConnListener(WifiConnStatusCallback);
-	SSTAR_UnRegisterWifiStaScanListener(WifiSignalSTRStatusCallback);
-
-	unregisterPrivTimer(&isRegistered, TIMER_LOADING);
 #endif
 }
 
@@ -227,6 +226,10 @@ static void onUI_hide() {
 static void onUI_quit() {
 #ifdef SUPPORT_WLAN_MODULE
 	WIFI_LOG("onUI_quit\n");
+
+	SSTAR_UnRegisterWifiStaConnListener(WifiConnStatusCallback);
+	SSTAR_UnRegisterWifiStaScanListener(WifiSignalSTRStatusCallback);
+	unregisterPrivTimer(&isRegistered, TIMER_LOADING);
 
 	g_scanResLock.lock();
 	g_vecScanResult.clear();
@@ -358,6 +361,12 @@ static void obtainListItemData_ListviewNetwork(ZKListView *pListView,ZKListView:
 	ZKListView::ZKListSubItem *pConnectStatusItem = pListItem->findSubItemByID(ID_NETWORKSETTING_SubItemConnected);
 
 	g_scanResLock.lock();
+	if (!g_vecScanResult.size())
+	{
+		printf("no scan result\n");
+		return;
+	}
+
 	const ScanResult_t &scanRes = g_vecScanResult.at(index);
 	bool bConnected = (g_connStatus && !strcmp(scanRes.ssid, g_connSsid));
 	g_scanResLock.unlock();
