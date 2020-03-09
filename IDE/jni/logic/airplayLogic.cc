@@ -97,7 +97,7 @@ int Ss_AirplayStart(void)
 
 void play_distInit(void)
 {
-	//Ss_AO_Deinit();
+	Ss_AO_Deinit();
 	Ss_DLNA_ServiceClose();
 	Ss_mAirplayServiceClose();
 }
