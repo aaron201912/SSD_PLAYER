@@ -85,6 +85,7 @@ typedef struct ST_Sys_Rect_s
 } ST_Rect_T;
 
 MI_U64 ST_Sys_GetPts(MI_U32 u32FrameRate) {
+    return 0;
 }
 
 FILE *g_pStreamFile[32] = {NULL};
