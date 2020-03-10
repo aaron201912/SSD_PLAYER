@@ -8,14 +8,6 @@
 
 #include "hotplugdetect.h"
 
-#if 0
-int SSTAR_GetWifiSignalLevel()
-{
-	// 0: no signal; 1-4: signalSTR
-	return 2;
-}
-#endif
-
 void SSTAR_ConnectWifi(MI_WLAN_ConnectParam_t *pstConnParam)
 {
 	Wifi_Connect(pstConnParam);
@@ -45,10 +37,6 @@ int SSTAR_GetWifiCurConnStatus(MI_WLAN_Status_t *status)
 {
 	return Wifi_GetCurConnStatus(status);
 }
-//MI_WLAN_ConnectParam_t* SSTAR_GetWifiConnParam()
-//{
-//	return Wifi_GetConnParam();
-//}
 
 int SSTAR_GetWiredNetworkCurrentStatus()
 {
