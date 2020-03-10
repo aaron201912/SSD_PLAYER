@@ -27,13 +27,10 @@ typedef struct
 	char ssid[MI_WLAN_MAX_SSID_LEN];
 	char mac[MI_WLAN_MAX_MAC_LEN];
 	bool bEncrypt;
-//	bool bConnected;
 	int signalSTR;
 } ScanResult_t;
 
-//typedef void (*WifiHotplugCallback)(unsigned int index, int status, char *pstIfName);
 typedef void (*WifiConnCallback)(char *pSsid, int status);
-//typedef void (*WifiScanCallback)(ScanResult_t *pstScanRes);
 typedef void (*WifiScanCallback)(ScanResult_t *pstScanResult, int resCnt);
 
 int Wifi_StartCheckHotplug();
@@ -49,7 +46,6 @@ int Wifi_GetEnableStatus();
 void Wifi_SetEnableStatus(int enable);
 int Wifi_GetSupportStatus();
 int Wifi_GetCurConnStatus(MI_WLAN_Status_t *status);
-//MI_WLAN_ConnectParam_t* Wifi_GetConnParam();
 
 #ifdef  __cplusplus
 }
