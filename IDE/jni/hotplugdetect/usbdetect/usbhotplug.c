@@ -34,8 +34,8 @@
 
 typedef struct
 {
-	list_t callbackList;
-	UsbHotplugCallback pfnCallback;
+    list_t callbackList;
+    UsbHotplugCallback pfnCallback;
 }UsbCallbackListData_t;
 
 
@@ -75,135 +75,93 @@ static int InitUsbHotplugSock()
         return -1;
     }
 
-//    pthread_mutex_init(&g_callbackListMutex, NULL);
-//    INIT_LIST_HEAD(&g_usbCallbackListHead);
-
     return hotplug_sock;
 }
 
 static void DeinitUsbHotplugSock(int sock)
 {
-//	UsbCallbackListData_t *pstUsbCallbackData = NULL;
-//	list_t *pListPos = NULL;
-//	list_t *pListPosN = NULL;
-//
-//	pthread_mutex_lock(&g_callbackListMutex);
-//	list_for_each_safe(pListPos, pListPosN, &g_usbCallbackListHead)
-//	{
-//		pstUsbCallbackData = list_entry(pListPos, UsbCallbackListData_t, callbackList);
-//		list_del(pListPos);
-//		free(pstUsbCallbackData);
-//	}
-//	pthread_mutex_unlock(&g_callbackListMutex);
-//
-//	pthread_mutex_destroy(&g_callbackListMutex);
-
-	if (sock != -1)
-		close(sock);
+    if (sock != -1)
+        close(sock);
 }
 
 static void *CheckUsbHotPlugProc(void *pdata)
 {
-	int hotplug_sock = InitUsbHotplugSock();
-	//UsbHotplugCallback pfnCallbak = (UsbHotplugCallback)pdata;
+    int hotplug_sock = InitUsbHotplugSock();
     char umountCmd[CMD_BUFFER_SIZE] = {0};
     char rmCmd[CMD_BUFFER_SIZE] = {0};
     int nRet = 0;
 
     printf("Exec CheckUsbHotPlugProc\n");
 
-	while(g_bCheckUsbThreadRun)
-	{
-		char buf[UEVENT_BUFFER_SIZE*2] = {0};
-		UsbCallbackListData_t *pstUsbCallbackData = NULL;
-		list_t *pListPos = NULL;
-		int len = recv(hotplug_sock, &buf, sizeof(buf), 0);
-#if 0
-        char *msg = buf;
-        while (*msg) {
-            printf("%s\n", msg);
-            if (!strncmp(msg, "ACTION=", 7)) {
-                msg += 7;
-            } else if (!strncmp(msg, "DEVPATH=", 8)) {
-                msg += 8;
-            } else if (!strncmp(msg, "SUBSYSTEM=", 10)) {
-                msg += 10;
-            } else if (!strncmp(msg, "FIRMWARE=", 9)) {
-                msg += 9;
-            } else if (!strncmp(msg, "MAJOR=", 6)) {
-                msg += 6;
-            } else if (!strncmp(msg, "MINOR=", 6)) {
-                msg += 6;
-            }
-
-            while(*msg++);
-        }
-
-		//printf("recv plug info: %s\n", buf);
-#endif
+    while(g_bCheckUsbThreadRun)
+    {
+        char buf[UEVENT_BUFFER_SIZE*2] = {0};
+        UsbCallbackListData_t *pstUsbCallbackData = NULL;
+        list_t *pListPos = NULL;
+        int len = recv(hotplug_sock, &buf, sizeof(buf), 0);
 
         if (strstr(buf, "sd") && (strlen(strstr(buf, "sd")) > DEV_NAME_LEN_MIN))
+	{
+	    char *pstmsg = strstr(buf, "sd") + strlen("sda/");
+	    UsbParam_t stUsbParam;
+	    memset(&stUsbParam, 0, sizeof(UsbParam_t));
+
+	    if (strstr(buf, "add"))
+	    {
+		printf("usb add\n");
+		stUsbParam.action = 1;
+		sprintf(stUsbParam.udisk_path, "/vendor/udisk_%s", pstmsg);
+
+		pthread_mutex_lock(&g_callbackListMutex);
+		list_for_each(pListPos, &g_usbCallbackListHead)
 		{
-			char *pstmsg = strstr(buf, "sd") + strlen("sda/");
-			UsbParam_t stUsbParam;
-			memset(&stUsbParam, 0, sizeof(UsbParam_t));
-
-			if (strstr(buf, "add"))
-			{
-				printf("usb add\n");
-				stUsbParam.action = 1;
-				sprintf(stUsbParam.udisk_path, "/vendor/udisk_%s", pstmsg);
-
-				pthread_mutex_lock(&g_callbackListMutex);
-				list_for_each(pListPos, &g_usbCallbackListHead)
-				{
-					pstUsbCallbackData = list_entry(pListPos, UsbCallbackListData_t, callbackList);
-					pstUsbCallbackData->pfnCallback(&stUsbParam);
-				}
-				pthread_mutex_unlock(&g_callbackListMutex);
-			}
-
-			if (strstr(buf, "remove"))
-			{
-				printf("usb remove\n");
-				stUsbParam.action = 0;
-				sprintf(stUsbParam.udisk_path, "/vendor/udisk_%s", pstmsg);
-
-				pthread_mutex_lock(&g_callbackListMutex);
-				list_for_each(pListPos, &g_usbCallbackListHead)
-				{
-					pstUsbCallbackData = list_entry(pListPos, UsbCallbackListData_t, callbackList);
-					pstUsbCallbackData->pfnCallback(&stUsbParam);
-				}
-				pthread_mutex_unlock(&g_callbackListMutex);
-
-				if (access(stUsbParam.udisk_path, F_OK) == 0)
-				{
-					//printf("access path:%s \n", stUsbParam.udisk_path);
-					memset(umountCmd, 0, CMD_BUFFER_SIZE);
-					sprintf(umountCmd, "umount %s", stUsbParam.udisk_path);
-					nRet = system(umountCmd);
-					if (nRet)
-					{
-						printf("umount  %s failed\n", stUsbParam.udisk_path);
-						continue;
-					}
-
-					memset(rmCmd, 0, CMD_BUFFER_SIZE);
-					sprintf(rmCmd, "rm -rf %s", stUsbParam.udisk_path);
-					system(rmCmd);
-				}
-			}
+		    pstUsbCallbackData = list_entry(pListPos, UsbCallbackListData_t, callbackList);
+	            pstUsbCallbackData->pfnCallback(&stUsbParam);
 		}
+		pthread_mutex_unlock(&g_callbackListMutex);
+	    }
 
-		usleep(50000);
+	    if (strstr(buf, "remove"))
+	    {
+	        printf("usb remove\n");
+		stUsbParam.action = 0;
+		sprintf(stUsbParam.udisk_path, "/vendor/udisk_%s", pstmsg);
+
+		pthread_mutex_lock(&g_callbackListMutex);
+		list_for_each(pListPos, &g_usbCallbackListHead)
+		{
+		    pstUsbCallbackData = list_entry(pListPos, UsbCallbackListData_t, callbackList);
+		    pstUsbCallbackData->pfnCallback(&stUsbParam);
+		}
+		pthread_mutex_unlock(&g_callbackListMutex);
+
+		if (access(stUsbParam.udisk_path, F_OK) == 0)
+		{
+		    //printf("access path:%s \n", stUsbParam.udisk_path);
+		    memset(umountCmd, 0, CMD_BUFFER_SIZE);
+		    sprintf(umountCmd, "umount %s", stUsbParam.udisk_path);
+		    nRet = system(umountCmd);
+		    if (nRet)
+		    {
+			printf("umount  %s failed\n", stUsbParam.udisk_path);
+			continue;
+		    }
+
+		    memset(rmCmd, 0, CMD_BUFFER_SIZE);
+		    sprintf(rmCmd, "rm -rf %s", stUsbParam.udisk_path);
+		    system(rmCmd);
+		}
+	    }
 	}
 
-	printf("close socket\n");
-	DeinitUsbHotplugSock(hotplug_sock);
+    usleep(50000);
+    }
 
-	printf("exit thread proc\n");
-	return NULL;
+    printf("close socket\n");
+    DeinitUsbHotplugSock(hotplug_sock);
+
+    printf("exit thread proc\n");
+    return NULL;
 }
 
 static char *freadline(FILE *stream)
