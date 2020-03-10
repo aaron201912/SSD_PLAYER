@@ -667,8 +667,3 @@ int Wifi_GetCurConnStatus(MI_WLAN_Status_t *status)
 {
 	return MI_WLAN_GetStatus(status);
 }
-//
-//MI_WLAN_ConnectParam_t* Wifi_GetConnParam()
-//{
-//	return &g_stConnParam;
-//}
