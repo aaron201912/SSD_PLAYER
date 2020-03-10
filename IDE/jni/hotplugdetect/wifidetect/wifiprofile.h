@@ -26,11 +26,8 @@ typedef struct
 
 
 bool getWifiSupportStatus();
-//void setWifiSupportStatus(bool enable);
 bool getWifiEnableStatus();
 void setWifiEnableStatus(bool enable);
-//bool getConnectionStatus();
-//void setConnectionStatus(bool enable);
 WLAN_HANDLE getWlanHandle();
 void setWlanHandle(WLAN_HANDLE handle);
 MI_WLAN_ConnectParam_t * getConnectParam();
