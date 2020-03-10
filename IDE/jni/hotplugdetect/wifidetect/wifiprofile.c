@@ -36,7 +36,6 @@
 static bool g_bWifiSupport = true;		// 设备是否支持wifi,由设备决定，不可更改
 static bool g_bWifiEnable = true;
 static char g_line[256];
-//static bool g_bConnected = false;
 static WLAN_HANDLE g_hWlan = -1;
 static MI_WLAN_ConnectParam_t g_stConnectParam;
 static cJSON *g_pRoot = NULL;
@@ -75,16 +74,6 @@ void setWifiEnableStatus(bool enable)
 {
 	g_bWifiEnable = enable;
 }
-
-//bool getConnectionStatus()
-//{
-//	return g_bConnected;
-//}
-//
-//void setConnectionStatus(bool enable)
-//{
-//	g_bConnected = enable;
-//}
 
 WLAN_HANDLE getWlanHandle()
 {
