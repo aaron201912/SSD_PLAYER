@@ -17,14 +17,12 @@ extern "C"
 #include "wifihotplug.h"
 #include "wirednetwork.h"
 
-//int SSTAR_GetWifiSignalLevel();
 void SSTAR_ConnectWifi(MI_WLAN_ConnectParam_t *pstConnParam);
 void SSTAR_DisconnectWifi();
 int SSTAR_GetWifiEnableStatus();
 void SSTAR_SetWifiEnableStatus(int enable);
 int SSTAR_GetWifiSupportStatus();
 int SSTAR_GetWifiCurConnStatus(MI_WLAN_Status_t *status);
-//MI_WLAN_ConnectParam_t* SSTAR_GetWifiConnParam();
 
 
 int SSTAR_GetWiredNetworkCurrentStatus();
