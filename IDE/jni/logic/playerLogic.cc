@@ -1086,8 +1086,8 @@ static void *PlayFileProc(void *pData)
 		if (eSkipMode != g_eSkipMode)
 		{
 			eSkipMode = g_eSkipMode;
-			g_eSkipMode = NO_SKIP;
 		}
+		g_eSkipMode = NO_SKIP;
 		if (bPlayError != g_bPlayError)
 		{
 			bPlayError = g_bPlayError;
