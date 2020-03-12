@@ -227,6 +227,49 @@ int open_audio_stream(player_stat_t *is)
     return 0;
 }
 
+/* return the wanted number of samples to get better sync if sync_type is video
+ * or external master clock */
+static int synchronize_audio(player_stat_t *is, int nb_samples)
+{
+    int wanted_nb_samples = nb_samples;
+
+    /* if not master, then we try to remove or add samples to correct the clock */
+    if (is->av_sync_type == AV_SYNC_VIDEO_MASTER && is->video_idx >= 0) {
+        double diff, avg_diff;
+        int min_nb_samples, max_nb_samples;
+
+        diff = get_clock(&is->audio_clk) - get_master_clock(is);
+
+        if (!isnan(diff) && fabs(diff) < AV_NOSYNC_THRESHOLD) {
+            is->audio_diff_cum = diff + is->audio_diff_avg_coef * is->audio_diff_cum;
+            if (is->audio_diff_avg_count < AUDIO_DIFF_AVG_NB) {
+                /* not enough measures to have a correct estimate */
+                is->audio_diff_avg_count++;
+            } else {
+                /* estimate the A-V difference */
+                avg_diff = is->audio_diff_cum * (1.0 - is->audio_diff_avg_coef);
+
+                if (fabs(avg_diff) >= is->audio_diff_threshold) {
+                    wanted_nb_samples = nb_samples + (int)(diff * is->audio_param_src.freq);
+                    min_nb_samples = ((nb_samples * (100 - SAMPLE_CORRECTION_PERCENT_MAX) / 100));
+                    max_nb_samples = ((nb_samples * (100 + SAMPLE_CORRECTION_PERCENT_MAX) / 100));
+                    wanted_nb_samples = av_clip(wanted_nb_samples, min_nb_samples, max_nb_samples);
+                }
+                AvUtilLibInfo.av_log(NULL, AV_LOG_TRACE, "diff=%f adiff=%f sample_diff=%d apts=%0.3f %f\n",
+                        diff, avg_diff, wanted_nb_samples - nb_samples,
+                        is->audio_clock, is->audio_diff_threshold);
+            }
+        } else {
+            /* too big difference : may be initial PTS errors, so
+               reset A-V filter */
+            is->audio_diff_avg_count = 0;
+            is->audio_diff_cum       = 0;
+        }
+    }
+
+    return wanted_nb_samples;
+}
+
 static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
 {
     int data_size, resampled_data_size;
@@ -283,8 +326,8 @@ replay:
     // 获取声道布局
     dec_channel_layout =
         (af->frame->channel_layout && af->frame->channels == AvUtilLibInfo.av_get_channel_layout_nb_channels(af->frame->channel_layout)) ?
-        af->frame->channel_layout : AvUtilLibInfo.av_get_default_channel_layout(af->frame->channels);
-    wanted_nb_samples = af->frame->nb_samples;
+         af->frame->channel_layout : AvUtilLibInfo.av_get_default_channel_layout(af->frame->channels);
+    wanted_nb_samples = synchronize_audio(is, af->frame->nb_samples);
     // is->audio_param_tgt是SDL可接受的音频帧数，是audio_open()中取得的参数
     // 在audio_open()函数中又有“is->audio_src = is->audio_param_tgt”
     // 此处表示：如果frame中的音频参数 == is->audio_src == is->audio_param_tgt，那音频重采样的过程就免了(因此时is->swr_ctr是NULL)
@@ -521,6 +564,13 @@ static int open_audio_playing(void *arg)
     is->audio_hw_buf_size = MI_AO_PCM_BUF_SIZE_BYTE;//is->audio_param_tgt.frame_size;   // SDL音频缓冲区大小
     is->audio_frm_size = 0;
     is->audio_cp_index = 0;
+    is->audio_write_buf_size = 0;
+    /* init averaging filter */
+    is->audio_diff_avg_coef  = exp(log(0.01) / AUDIO_DIFF_AVG_NB);
+    is->audio_diff_avg_count = 0;
+    /* since we do not have a precise anough audio FIFO fullness,
+       we correct audio sync only if larger than this threshold */
+    is->audio_diff_threshold = (double)(is->audio_hw_buf_size) / is->audio_param_tgt.bytes_per_sec;
 
     CheckFuncResult(pthread_create(&is->audioPlay_tid, NULL, audio_playing_thread, is));
 

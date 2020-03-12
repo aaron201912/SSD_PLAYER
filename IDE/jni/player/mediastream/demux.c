@@ -129,6 +129,15 @@ static int demux_init(player_stat_t *is)
                 goto fail;
             }
         }
+        else
+        {
+            if (p_codec_par->width > 1920 && p_codec_par->height > 1080)
+            {
+                av_log(NULL, AV_LOG_WARNING, "WARNNING: The resolution of video is over 1080P!!!\n");
+                ret = -2;
+                goto fail;
+            }
+        }
     }
     else
     {
@@ -293,10 +302,14 @@ static void* demux_thread(void *arg)
             //printf("wait video queue avalible pktnb: %d\n",is->video_pkt_queue.nb_packets);
             //printf("wait audio queue avalible pktnb: %d\n",is->audio_pkt_queue.nb_packets);
             if (is->audio_pkt_queue.size + is->video_pkt_queue.size > MAX_QUEUE_SIZE &&
-                is->audio_pkt_queue.nb_packets == 0)
+                is->audio_pkt_queue.nb_packets == 0 && !is->play_error)
             {
                 av_log(NULL, AV_LOG_WARNING, "WARNING: Please Reduce The Resolution Of Video!!!\n");
                 is->play_error = -3;
+                //printf("queue size: %d, video pkt size: %d, audio pkt size: %d\n",
+                //       is->audio_pkt_queue.size + is->video_pkt_queue.size,
+                //       is->video_pkt_queue.nb_packets,
+                //       is->audio_pkt_queue.nb_packets);
             }
 
             continue;

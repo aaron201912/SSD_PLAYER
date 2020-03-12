@@ -51,7 +51,7 @@ static int get_master_sync_type(player_stat_t *is) {
 
 
 /* get the current master clock value */
-static double get_master_clock(player_stat_t *is)
+double get_master_clock(player_stat_t *is)
 {
     double val;
 
@@ -142,13 +142,12 @@ static void video_decoder_abort(player_stat_t *is)
 {
     packet_queue_abort(&is->video_pkt_queue);
     frame_queue_signal(&is->video_frm_queue);
-    #if (!ENABLE_SMALL)
     pthread_join(is->videoDecode_tid, NULL);
-    #endif
     pthread_join(is->videoPlay_tid, NULL);
 
     packet_queue_flush(&is->video_pkt_queue);
     printf("video packet flush done!\n");
+    video_buffer_flush(is);
     avcodec_free_context(&is->p_vcodec_ctx);
 }
 
@@ -329,9 +328,6 @@ int player_deinit(player_stat_t *is)
 
         avformat_close_input(&is->p_fmt_ctx);
         printf("avformat_close_input finish!\n");
-
-//        dd_meminfo();
-//        printf("[%s %d]\n", __FUNCTION__, __LINE__);
     }
     /* free all pictures */
     packet_queue_destroy(&is->video_pkt_queue);
@@ -348,9 +344,6 @@ int player_deinit(player_stat_t *is)
     printf("av_free filename!\n");
     av_freep(&is);
     printf("av_free is!\n");
-
-//    dd_meminfo();
-//    printf("[%s %d]\n", __FUNCTION__, __LINE__);
 
     return 0;
 }

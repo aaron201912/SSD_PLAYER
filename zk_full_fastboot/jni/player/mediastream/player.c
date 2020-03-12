@@ -62,7 +62,7 @@ static int get_master_sync_type(player_stat_t *is) {
 
 
 /* get the current master clock value */
-static double get_master_clock(player_stat_t *is)
+double get_master_clock(player_stat_t *is)
 {
     double val;
 
@@ -79,7 +79,6 @@ static double get_master_clock(player_stat_t *is)
     }
     return val;
 }
-
 
 // 返回值：返回上一帧的pts更新值(上一帧pts+流逝的时间)
 double get_clock(play_clock_t *c)
@@ -153,13 +152,13 @@ static void video_decoder_abort(player_stat_t *is)
 {
     packet_queue_abort(&is->video_pkt_queue);
     frame_queue_signal(&is->video_frm_queue);
-    #if (!ENABLE_SMALL)
+
     pthread_join(is->videoDecode_tid, NULL);
-    #endif
     pthread_join(is->videoPlay_tid, NULL);
 
     packet_queue_flush(&is->video_pkt_queue);
     printf("video packet flush done!\n");
+    video_buffer_flush(is);
     AvCodecLibInfo.avcodec_free_context(&is->p_vcodec_ctx);
 }
 

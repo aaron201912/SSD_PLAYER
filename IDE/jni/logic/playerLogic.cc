@@ -38,6 +38,7 @@
 #include "mi_sys.h"
 #include "mi_divp.h"
 #include "mi_disp.h"
+#include "mi_vdec_extra.h"
 //#include "mi_panel.h"
 //#include "mi_gfx.h"
 #include "utils/BitmapHelper.h"
@@ -549,49 +550,117 @@ MI_S32 GetStreamFilePlayPos(long long currentPos, long long frame_duration)
     return 0;
 }
 
+
+MI_S32 VideoPutBufBack(void *pData)
+{
+    MI_S32 s32Ret;
+    AVFrame *pFrame = (AVFrame *)pData;
+
+    if (pFrame->opaque)
+    {
+        SS_Vdec_BufInfo *stVdecBuf = (SS_Vdec_BufInfo *)pFrame->opaque;
+        //printf("frame->opaque addr : %p\n", pFrame->opaque);
+        s32Ret = MI_SYS_ChnOutputPortPutBuf(stVdecBuf->stVdecHandle);
+        if (MI_SUCCESS != s32Ret)
+            printf("MI_SYS_ChnOutputPortPutBuf Failed!\n");
+        return s32Ret;
+    }
+
+    return -1;
+}
+
+
 // MI display video
-MI_S32 DisplayVideo(MI_S32 s32DispWidth, MI_S32 s32DispHeight, void *pYData, void *pUVData)
+MI_S32 DisplayVideo(void *pData, bool bState)
 {
     MI_SYS_BUF_HANDLE hHandle;
-    MI_SYS_ChnPort_t pstSysChnPort;
+    MI_SYS_ChnPort_t stInputChnPort;
     MI_SYS_BufConf_t stBufConf;
     MI_SYS_BufInfo_t stBufInfo;
 
-    pstSysChnPort.eModId = E_MI_MODULE_ID_DIVP;
-    pstSysChnPort.u32ChnId = 0;
-    pstSysChnPort.u32DevId = 0;
-    pstSysChnPort.u32PortId = 0;
+	AVFrame *pFrame = (AVFrame *)pData;
+
+    memset(&stInputChnPort, 0, sizeof(MI_SYS_ChnPort_t));
+    stInputChnPort.eModId    = E_MI_MODULE_ID_DIVP;
+    stInputChnPort.u32ChnId  = 0;
+    stInputChnPort.u32DevId  = 0;
+    stInputChnPort.u32PortId = 0;
 
     memset(&stBufInfo , 0 , sizeof(MI_SYS_BufInfo_t));
     memset(&stBufConf , 0 , sizeof(MI_SYS_BufConf_t));
 
     stBufConf.eBufType = E_MI_SYS_BUFDATA_FRAME;
     stBufConf.u64TargetPts = 0;
-    stBufConf.stFrameCfg.u16Width = s32DispWidth;
-    stBufConf.stFrameCfg.u16Height = s32DispHeight;
-    stBufConf.stFrameCfg.eFormat = E_MI_SYS_PIXEL_FRAME_YUV_SEMIPLANAR_420;
+    stBufConf.stFrameCfg.u16Width  = pFrame->width;
+    stBufConf.stFrameCfg.u16Height = pFrame->height;
+    stBufConf.stFrameCfg.eFormat   = E_MI_SYS_PIXEL_FRAME_YUV_SEMIPLANAR_420;
     stBufConf.stFrameCfg.eFrameScanMode = E_MI_SYS_FRAME_SCAN_MODE_PROGRESSIVE;
 
-    if(MI_SUCCESS == MI_SYS_ChnInputPortGetBuf(&pstSysChnPort,&stBufConf,&stBufInfo,&hHandle, -1))
+    if(MI_SUCCESS == MI_SYS_ChnInputPortGetBuf(&stInputChnPort,&stBufConf,&stBufInfo,&hHandle, -1))
     {
-        int index = 0;
         stBufInfo.stFrameData.eCompressMode = E_MI_SYS_COMPRESS_MODE_NONE;
         stBufInfo.stFrameData.eFieldType = E_MI_SYS_FIELDTYPE_NONE;
         stBufInfo.stFrameData.eTileMode = E_MI_SYS_FRAME_TILE_MODE_NONE;
         stBufInfo.bEndOfStream = FALSE;
 
-        for (index = 0; index < stBufInfo.stFrameData.u16Height; index ++)
-        {
-            memcpy(stBufInfo.stFrameData.pVirAddr[0] + index * stBufInfo.stFrameData.u32Stride[0],
-                   pYData + index * stBufInfo.stFrameData.u16Width,
-                   stBufInfo.stFrameData.u16Width);
-        }
+		if (!bState)
+		{
+			for (int index = 0; index < stBufInfo.stFrameData.u16Height; index ++)
+	        {
+	            memcpy(stBufInfo.stFrameData.pVirAddr[0] + index * stBufInfo.stFrameData.u32Stride[0],
+	                   pFrame->data[0] + index * stBufInfo.stFrameData.u16Width,
+	                   stBufInfo.stFrameData.u16Width);
+	        }
 
-        for (index = 0; index < stBufInfo.stFrameData.u16Height / 2; index ++)
+	        for (int index = 0; index < stBufInfo.stFrameData.u16Height / 2; index ++)
+	        {
+	            memcpy(stBufInfo.stFrameData.pVirAddr[1] + index * stBufInfo.stFrameData.u32Stride[1],
+	                   pFrame->data[1] + index * stBufInfo.stFrameData.u16Width,
+	                   stBufInfo.stFrameData.u16Width);
+	        }
+        }
+        else
         {
-            memcpy(stBufInfo.stFrameData.pVirAddr[1] + index * stBufInfo.stFrameData.u32Stride[1],
-                   pUVData + index * stBufInfo.stFrameData.u16Width,
-                   stBufInfo.stFrameData.u16Width);
+        	SS_Vdec_BufInfo *stVdecBuf = (SS_Vdec_BufInfo *)pFrame->opaque;
+    		MI_S32 s32Len = pFrame->width * pFrame->height;
+
+            // bframe buf is meta data, inject function isn't supported, so using memory copy
+            if (stVdecBuf->bType)
+            {
+                mi_vdec_DispFrame_t *pstVdecInfo = (mi_vdec_DispFrame_t *)stVdecBuf->stVdecBufInfo.stMetaData.pVirAddr;
+
+                #if 1
+                MI_SYS_MemcpyPa(stBufInfo.stFrameData.phyAddr[0],
+                                pstVdecInfo->stFrmInfo.phyLumaAddr , 
+                                s32Len);
+                MI_SYS_MemcpyPa(stBufInfo.stFrameData.phyAddr[1],
+                                pstVdecInfo->stFrmInfo.phyChromaAddr, 
+                                s32Len / 2);
+                #else
+                void *vdec_vir_addr;
+                MI_SYS_Mmap(pstVdecInfo->stFrmInfo.phyLumaAddr, ALIGN_UP(s32Len + s32Len / 2, 4096), &vdec_vir_addr, FALSE);
+                memcpy(stBufInfo.stFrameData.pVirAddr[0], vdec_vir_addr, s32Len);
+                memcpy(stBufInfo.stFrameData.pVirAddr[1], vdec_vir_addr + s32Len, s32Len / 2);
+                MI_SYS_Munmap(vdec_vir_addr, ALIGN_UP(s32Len + s32Len / 2, 4096));
+                #endif
+
+                VideoPutBufBack(pFrame);
+            }
+            else
+            {
+                #if 0
+                if (MI_SUCCESS != MI_SYS_ChnPortInjectBuf(stVdecBuf->stVdecHandle, &stInputChnPort))
+                    av_log(NULL, AV_LOG_ERROR, "MI_SYS_ChnPortInjectBuf failed!\n");
+                #else
+                MI_SYS_MemcpyPa(stBufInfo.stFrameData.phyAddr[0],
+                                stVdecBuf->stVdecBufInfo.stFrameData.phyAddr[0],
+                                s32Len);
+                MI_SYS_MemcpyPa(stBufInfo.stFrameData.phyAddr[1],
+                                stVdecBuf->stVdecBufInfo.stFrameData.phyAddr[1],
+                                s32Len / 2);
+                VideoPutBufBack(pFrame);
+                #endif
+            }
         }
 
         MI_SYS_ChnInputPortPutBuf(hHandle ,&stBufInfo , FALSE);
@@ -745,6 +814,7 @@ static void SetStreamPlayerControlCallBack(player_stat_t *is)
 	is->playerController.fpGetCurrentPlayPosFromVideo = NULL;
 	is->playerController.fpGetCurrentPlayPosFromAudio = NULL;
 	is->playerController.fpDisplayVideo = DisplayVideo;
+	is->playerController.fpVideoPutBufBack = VideoPutBufBack;
 	is->playerController.fpPlayAudio = PlayAudio;
 	is->playerController.fpPauseAudio = PauseAudio;
 	is->playerController.fpResumeAudio = ResumeAudio;

@@ -11,7 +11,6 @@ extern "C" {               // 告诉编译器下列代码要以C链接约定的�
 #include <stdbool.h>
 #include <pthread.h>
 
-
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libswscale/swscale.h>
@@ -19,14 +18,14 @@ extern "C" {               // 告诉编译器下列代码要以C链接约定的�
 #include <libavutil/frame.h>
 #include <libavutil/time.h>
 #include <libavutil/imgutils.h>
+#include <libavutil/avassert.h>
+#include <libavutil/log.h>
 
 #include "mi_common.h"
 #include "mi_common_datatype.h"
 #include "mi_sys.h"
 #include "mi_sys_datatype.h"
 
-#define     SUPPORT_B_FRAME 1
-#define     ENABLE_SMALL    0
 #define     SUCCESS         0
 #define     FAIL            1
 
@@ -144,13 +143,15 @@ extern Sws_LibInfo_t SwsLibInfo;
 /* no AV correction is done if too big error */
 #define AV_NOSYNC_THRESHOLD 10.0
 
+#define SAMPLE_CORRECTION_PERCENT_MAX 10
+#define AUDIO_DIFF_AVG_NB   20
 /* polls for possible required screen refresh at least this often, should be less than 1/fps */
 #define REFRESH_RATE 0.01
 
 #define SDL_AUDIO_BUFFER_SIZE 1024
 #define MAX_AUDIO_FRAME_SIZE 192000
 
-#define MAX_QUEUE_SIZE (5 * 1024 * 1024)
+#define MAX_QUEUE_SIZE (15 * 1024 * 1024)
 #define MIN_FRAMES 25
 
 /* Minimum SDL audio buffer size, in samples. */
@@ -158,7 +159,7 @@ extern Sws_LibInfo_t SwsLibInfo;
 /* Calculate actual buffer size keeping in mind not cause too frequent audio callbacks */
 #define SDL_AUDIO_MAX_CALLBACKS_PER_SEC 30
 
-#define VIDEO_PICTURE_QUEUE_SIZE 3
+#define VIDEO_PICTURE_QUEUE_SIZE 2
 #define SUBPICTURE_QUEUE_SIZE 16
 #define SAMPLE_QUEUE_SIZE 9
 #define FRAME_QUEUE_SIZE FFMAX(SAMPLE_QUEUE_SIZE, FFMAX(VIDEO_PICTURE_QUEUE_SIZE, SUBPICTURE_QUEUE_SIZE))
@@ -238,7 +239,8 @@ typedef struct {
     MI_S32 (*fpGetCurrentPlayPos)(long long currentPos, long long frame_duration);
     MI_S32 (*fpGetCurrentPlayPosFromVideo)(long long currentPos, long long frame_duration);
     MI_S32 (*fpGetCurrentPlayPosFromAudio)(long long currentPos, long long frame_duration);
-    MI_S32 (*fpDisplayVideo)(MI_S32 s32Width, MI_S32 s32Height, void *pYData, void *pUVData);
+    MI_S32 (*fpDisplayVideo)(void *pData, bool bState);
+    MI_S32 (*fpVideoPutBufBack)(void *pData);
     MI_S32 (*fpPlayAudio)(MI_U8 *pu8AudioData, MI_U32 u32DataLen);
     MI_S32 (*fpPauseAudio)();
     MI_S32 (*fpResumeAudio)();
@@ -283,6 +285,10 @@ typedef struct {
     int audio_write_buf_size;           // 当前音频帧中尚未拷入SDL音频缓冲区的数据量，audio_frm_size = audio_cp_index + audio_write_buf_size
     double audio_clock;
     int audio_clock_serial;
+    double audio_diff_cum;
+    double audio_diff_avg_coef;
+    double audio_diff_threshold;
+    int audio_diff_avg_count;
 
     int abort_request;
     int paused;
@@ -322,6 +328,7 @@ player_stat_t *player_init(const char *p_input_file);
 int player_deinit(player_stat_t *is);
 void toggle_pause(player_stat_t *is);
 double get_clock(play_clock_t *c);
+double get_master_clock(player_stat_t *is);
 void set_clock_at(play_clock_t *c, double pts, int serial, double time);
 void set_clock(play_clock_t *c, double pts, int serial);
 void stream_toggle_pause(player_stat_t *is);

@@ -18,7 +18,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-
+#include <sys/time.h>
 
 extern AVPacket v_flush_pkt;
 
@@ -43,9 +43,21 @@ static int queue_picture(player_stat_t *is, AVFrame *src_frame, double pts, doub
     //vp->serial = serial;
 
     //set_default_window_size(vp->width, vp->height, vp->sar);
-    
+
     // 将AVFrame拷入队列相应位置
-    av_frame_move_ref(vp->frame, src_frame);
+    if (is->decode_type == SOFT_DECODING)
+    {
+        av_frame_move_ref(vp->frame, src_frame);
+    }
+    else
+    {
+        memset(vp->frame, 0, sizeof(*vp->frame));
+        vp->frame->opaque = src_frame->opaque;
+        vp->frame->width  = src_frame->width;
+        vp->frame->height = src_frame->height;
+        vp->frame->pts    = src_frame->pts;
+        vp->frame->format = src_frame->format;
+    }
     //printf("queue frame fomat: %d\n",vp->frame->format);
     // 更新队列计数及写索引
     //printf("before queue ridx: %d,widx: %d,size: %d,maxsize: %d\n ",is->video_frm_queue.rindex,is->video_frm_queue.windex,is->video_frm_queue.size,is->video_frm_queue.max_size);
@@ -53,7 +65,6 @@ static int queue_picture(player_stat_t *is, AVFrame *src_frame, double pts, doub
     //printf("after queue ridx: %d,widx: %d,size: %d,maxsize: %d\n ",is->video_frm_queue.rindex,is->video_frm_queue.windex,is->video_frm_queue.size,is->video_frm_queue.max_size);
     return 0;
 }
-
 
 // 从packet_queue中取一个packet，解码生成frame
 static int video_decode_frame(AVCodecContext *p_codec_ctx, packet_queue_t *p_pkt_queue, AVFrame *frame)
@@ -214,46 +225,63 @@ exit:
 // 返回值delay是将输入参数delay经校正后得到的值
 static double compute_target_delay(double delay, player_stat_t *is)
 {
-    double sync_threshold, diff = 0, delay_tim = delay;
-
+    double sync_threshold, diff = 0;
+    static double last_diff;
+    double max_delay, min_delay;
     /* update delay to follow master synchronisation source */
 
     /* if video is slave, we try to correct big delays by
        duplicating or deleting a frame */
     // 视频时钟与同步时钟(如音频时钟)的差异，时钟值是上一帧pts值(实为：上一帧pts + 上一帧至今流逝的时间差)
-    if (is->audio_idx >= 0 && is->video_idx >= 0)
-        diff = get_clock(&is->video_clk) - get_clock(&is->audio_clk);
-    else
-        return delay;
-    //printf("audio pts: %lf,video pts: %lf\n",is->audio_clk.pts,is->video_clk.pts);
-    //printf("audio clock: %lf,video clock: %lf\n",get_clock(&is->audio_clk),get_clock(&is->video_clk));
-    //printf("video pts: %lf,lu: %lf,curtime: %lf\n ",is->video_clk.pts,is->video_clk.last_updated,av_gettime_relative() / 1000000.0);
-    //printf("audio pts: %lf,lu: %lf,curtime: %lf\n ",is->audio_clk.pts,is->audio_clk.last_updated,av_gettime_relative() / 1000000.0);
-    //printf("video diff audio time: %lf\n",diff);
-    // delay是上一帧播放时长：当前帧(待播放的帧)播放时间与上一帧播放时间差理论值
-    // diff是视频时钟与同步时钟的差值
-
-    /* skip or repeat frame. We take into account the
-       delay to compute the threshold. I still don't know
-       if it is the best guess */
-    // 若delay < AV_SYNC_THRESHOLD_MIN，则同步域值为AV_SYNC_THRESHOLD_MIN
-    // 若delay > AV_SYNC_THRESHOLD_MAX，则同步域值为AV_SYNC_THRESHOLD_MAX
-    // 若AV_SYNC_THRESHOLD_MIN < delay < AV_SYNC_THRESHOLD_MAX，则同步域值为delay
-    sync_threshold = FFMAX(AV_SYNC_THRESHOLD_MIN, FFMIN(AV_SYNC_THRESHOLD_MAX, delay));
-    if (!isnan(diff))
+    if (is->av_sync_type == AV_SYNC_AUDIO_MASTER && is->audio_idx >= 0)
     {
-        if (diff <= -sync_threshold)                // 视频时钟落后于同步时钟,且超过同步域值
-            delay_tim = FFMAX(0, delay + diff);     // 当前帧播放时刻落后于同步时钟(delay+diff<0)则delay=0(视频追赶，立即播放)，否则delay=delay+diff
-        else if (diff > 0 && diff < sync_threshold) // 视频时钟超前于同步时钟,在同步时钟域内
-            delay_tim = diff;
-        else if (diff <= AV_SYNC_FRAMEDUP_THRESHOLD)// 视频时钟超前于同步时钟,且超过同步域值
-            delay_tim = 2 * delay;                  // 视频播放要放慢脚步，delay扩大至2倍
-        else if (diff > AV_SYNC_FRAMEDUP_THRESHOLD) // 视频时钟超前于同步时钟超过最大值,说明发生跳转
-            delay_tim = AV_SYNC_FRAMEDUP_THRESHOLD;
-    }
-    //printf("video: delay=%0.3f A-V=%f\n", delay_tim, -diff);
+        diff = get_clock(&is->video_clk) - get_master_clock(is);
 
-    return delay_tim;
+        //printf("audio pts: %lf,video pts: %lf\n",is->audio_clk.pts,is->video_clk.pts);
+        //printf("audio clock: %lf,video clock: %lf\n",get_clock(&is->audio_clk),get_clock(&is->video_clk));
+        //printf("video pts: %lf,lu: %lf,curtime: %lf\n ",is->video_clk.pts,is->video_clk.last_updated,av_gettime_relative() / 1000000.0);
+        //printf("audio pts: %lf,lu: %lf,curtime: %lf\n ",is->audio_clk.pts,is->audio_clk.last_updated,av_gettime_relative() / 1000000.0);
+        //printf("video diff audio time: %lf\n",diff);
+        // delay是上一帧播放时长：当前帧(待播放的帧)播放时间与上一帧播放时间差理论值
+        // diff是视频时钟与同步时钟的差值
+
+        /* skip or repeat frame. We take into account the
+           delay to compute the threshold. I still don't know
+           if it is the best guess */
+        // 若delay < AV_SYNC_THRESHOLD_MIN，则同步域值为AV_SYNC_THRESHOLD_MIN
+        // 若delay > AV_SYNC_THRESHOLD_MAX，则同步域值为AV_SYNC_THRESHOLD_MAX
+        // 若AV_SYNC_THRESHOLD_MIN < delay < AV_SYNC_THRESHOLD_MAX，则同步域值为delay
+        sync_threshold = FFMAX(AV_SYNC_THRESHOLD_MIN, FFMIN(AV_SYNC_THRESHOLD_MAX, delay));
+        if (!isnan(diff))
+        {
+            #if 0
+            if (diff <= -sync_threshold)            // 视频时钟落后于同步时钟,且超过同步域值
+                delay = FFMAX(0, delay + diff);     // 当前帧播放时刻落后于同步时钟(delay+diff<0)则delay=0(视频追赶，立即播放)，否则delay=delay+diff
+            else if (diff > sync_threshold && diff >= AV_SYNC_FRAMEDUP_THRESHOLD) 
+                delay = delay + AV_SYNC_FRAMEDUP_THRESHOLD;                       // 视频时钟超前于同步时钟,且超过同步域值
+            else if (diff >= sync_threshold)
+                delay = 2 * delay;                  // 视频播放要放慢脚步，delay扩大至2倍
+            #else
+            if (diff < -2 * sync_threshold) {
+                delay = FFMAX(0, delay + diff);
+            }
+            else if (diff > 2 * sync_threshold) {
+                delay = delay * 2;
+            }
+            else {
+                min_delay = 0.9 * delay;
+                max_delay = 1.1 * delay;
+                delay = delay + 0.05 * diff + (diff - last_diff);
+                last_diff = diff;
+                delay = (delay > max_delay) ? max_delay : delay;
+                delay = (delay < min_delay) ? min_delay : delay;
+            }
+            #endif
+        }
+    }
+    //printf("video: delay=%0.3f A-V=%f\n", delay, -diff);
+
+    return delay;
 }
 
 static double vp_duration(player_stat_t *is, frame_t *vp, frame_t *nextvp) {
@@ -275,10 +303,11 @@ static void update_video_pts(player_stat_t *is, double pts, int64_t pos, int ser
     //-sync_clock_to_slave(&is->extclk, &is->vidclk);  // 将extclock同步到vidclock
 }
 
+//struct timeval trans_start, trans_tim;
+//int64_t time0;
 static void video_display(player_stat_t *is)
 {
     frame_t *vp;
-    uint8_t *frame_ydata, *frame_uvdata;
 
     vp = frame_queue_peek_last(&is->video_frm_queue);
     if (!vp->frame->width || !vp->frame->height)
@@ -305,18 +334,26 @@ static void video_display(player_stat_t *is)
                   is->p_frm_yuv->data,                    // dst planes
                   is->p_frm_yuv->linesize                 // dst strides
                   );
-        frame_ydata  = is->p_frm_yuv->data[0];
-        frame_uvdata = is->p_frm_yuv->data[1];
+        is->p_frm_yuv->width  = vp->frame->width;
+        is->p_frm_yuv->height = vp->frame->height;
+        if (is->playerController.fpDisplayVideo) {
+            is->playerController.fpDisplayVideo((void *)is->p_frm_yuv, false);
+        }
     }
     else if (is->decode_type == HARD_DECODING)
     {
-        frame_ydata  = vp->frame->data[0];
-        frame_uvdata = vp->frame->data[1];
+        av_assert0(vp->frame->opaque);
+        if (is->playerController.fpDisplayVideo) {
+            is->playerController.fpDisplayVideo((void *)vp->frame, true);
+        }
+        av_freep(&vp->frame->opaque);
     }
-    // 跳转到UI执行显示函数
-    if (is->playerController.fpDisplayVideo) {
-        is->playerController.fpDisplayVideo(vp->frame->width, vp->frame->height, frame_ydata, frame_uvdata);
-    }
+
+    //trans_start.tv_sec  = trans_tim.tv_sec;
+    //trans_start.tv_usec = trans_tim.tv_usec;
+    //gettimeofday(&trans_tim, NULL);
+    //time0 = ((int64_t)trans_tim.tv_sec * 1000000 + trans_tim.tv_usec) - ((int64_t)trans_start.tv_sec * 1000000 + trans_start.tv_usec);
+    //printf("time gap of sending data to divp: %lldus\n", time0);
 }
 
 /* called to display each frame */
@@ -333,7 +370,11 @@ retry:
 
     if (is->seek_flags & (1 << 6))
     {
-        frame_queue_flush(&is->video_frm_queue);
+        if (is->decode_type == SOFT_DECODING) {
+            frame_queue_flush(&is->video_frm_queue);
+        } else {
+            video_buffer_flush(is);
+        }
         is->seek_flags &= ~(1 << 6);
     }
 
@@ -397,6 +438,12 @@ retry:
         // 当前帧vp未能及时播放，即下一帧播放时刻(is->frame_timer+duration)小于当前系统时刻(time)
         if (time > is->frame_timer + duration)
         {
+            if (is->decode_type == HARD_DECODING) {
+                av_assert0(vp->frame->opaque);
+                if (is->playerController.fpVideoPutBufBack)
+                    is->playerController.fpVideoPutBufBack(vp->frame);
+                av_freep(&vp->frame->opaque);
+            }
             frame_queue_next(&is->video_frm_queue);   // 删除上一帧已显示帧，即删除lastvp，读指针加1(从lastvp更新到vp)
             //printf("discarded current frame!\n");
             goto retry;
@@ -413,6 +460,7 @@ retry:
     video_display(is);                      // 取出当前帧vp(若有丢帧是nextvp)进行播放
 }
 
+#if 0
 static int video_refresh_async(void *opaque, double *remaining_time, double duration)
 {
     player_stat_t *is = (player_stat_t *)opaque;
@@ -582,6 +630,7 @@ static int video_refresh_async(void *opaque, double *remaining_time, double dura
 
     return 0;
 }
+#endif
 
 static void* video_playing_thread(void *arg)
 {
@@ -608,12 +657,7 @@ static void* video_playing_thread(void *arg)
         }
         remaining_time = REFRESH_RATE;
         // 立即显示当前帧，或延时remaining_time后再显示
-
-        #if ENABLE_SMALL
-        video_refresh_async(is, &remaining_time, duration);
-        #else
         video_refresh(is, &remaining_time, duration);
-        #endif
     }
 
     return NULL;
@@ -772,12 +816,33 @@ static int open_video_stream(player_stat_t *is)
     printf("codec width: %d,height: %d\n",is->p_vcodec_ctx->width,is->p_vcodec_ctx->height);
 
     // 2. 创建视频解码线程
-    #if (!ENABLE_SMALL)
     CheckFuncResult(pthread_create(&is->videoDecode_tid, NULL, video_decode_thread, is));
-    #endif
 
     return 0;
 }
+
+int video_buffer_flush(player_stat_t *is)
+{
+    int i, ret = 0;
+    frame_queue_t *f = &is->video_frm_queue;
+
+    pthread_mutex_lock(&f->mutex);
+    for (i = 0; i < f->max_size; i ++) {
+        frame_t *vp = &f->queue[i];
+        if (vp->frame->opaque && is->playerController.fpVideoPutBufBack) {
+            ret = is->playerController.fpVideoPutBufBack(vp->frame);
+            av_freep(&vp->frame->opaque);
+        }
+    }
+    f->rindex = 0;
+    f->rindex_shown = 0;
+    f->windex = 0;
+    f->size   = 0;
+    pthread_cond_signal(&f->cond);
+    pthread_mutex_unlock(&f->mutex);
+    return ret;
+}
+
 
 int open_video(player_stat_t *is)
 {

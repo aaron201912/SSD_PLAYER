@@ -28,6 +28,7 @@ extern "C" {               // 告诉编译器下列代码要以C链接约定的�
 #define HARD_DECODING   1
 
 int open_video(player_stat_t *is);
+int video_buffer_flush(player_stat_t *is);
 
 #endif
 

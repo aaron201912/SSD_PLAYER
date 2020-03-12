@@ -649,6 +649,11 @@ MI_S32 SSTAR_CreateVdecChannel(MI_S32 s32VdecChn, MI_S32 s32CodecType,
 {
     MI_VDEC_ChnAttr_t stVdecChnAttr;
     MI_VDEC_OutputPortAttr_t stOutputPortAttr;
+    MI_VDEC_InitParam_t stVdecInitParam;
+
+    memset(&stVdecInitParam, 0, sizeof(MI_VDEC_InitParam_t));
+    stVdecInitParam.bDisableLowLatency = false;
+    MI_VDEC_InitDev(&stVdecInitParam);
 
     memset(&stVdecChnAttr, 0, sizeof(MI_VDEC_ChnAttr_t));
     stVdecChnAttr.stVdecVideoAttr.u32RefFrameNum = 2;
@@ -729,6 +734,8 @@ MI_S32 SSTAR_DestroyVdec2DispPipe(MI_S32 s32VdecChn, MI_S32 s32DivpChn)
                     E_MI_MODULE_ID_DISP, 0, 0, 0); //DIVP->DISP
     SSTAR_DestroyVdecChannel(s32VdecChn);
     MI_DISP_DisableInputPort(0, 0);
+
+    MI_VDEC_DeInitDev();
 
     return MI_SUCCESS;
 }
