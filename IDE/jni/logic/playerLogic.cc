@@ -1043,7 +1043,7 @@ RepeatMode_e operator++(RepeatMode_e& cmd)
 static void PollRepeatMode()
 {
 	RepeatMode_e eRepeatMode = FILE_REPEAT_MODE;
-	pthread_mutex_unlock(&g_playFileMutex);
+	pthread_mutex_lock(&g_playFileMutex);
 	if (g_eRepeatMode < LIST_REPEAT_MODE)
 		g_eRepeatMode++;
 	else
