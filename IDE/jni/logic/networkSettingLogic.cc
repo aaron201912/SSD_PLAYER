@@ -165,9 +165,9 @@ static void onUI_intent(const Intent *intentPtr) {
 	{
 		WIFI_LOG("support wifi\n");
 		bool bWifiEnable = (bool)SSTAR_GetWifiEnableStatus();
-		mTextviewNotSupportPtr->setVisible(FALSE);
-		mTextviewWifiPtr->setVisible(TRUE);
-		mButtonWifiswPtr->setVisible(TRUE);
+		mTextviewNotSupportPtr->setVisible(false);
+		mTextviewWifiPtr->setVisible(true);
+		mButtonWifiswPtr->setVisible(true);
 		mButtonWifiswPtr->setSelected(bWifiEnable);
 		mTextviewWifiListPtr->setVisible(bWifiEnable);
 		mTextview_loadingPtr->setVisible(bWifiEnable);
@@ -184,14 +184,14 @@ static void onUI_intent(const Intent *intentPtr) {
 	else
 	{
 		WIFI_LOG("not support wifi\n");
-		mTextviewNotSupportPtr->setVisible(TRUE);
-		mTextviewWifiPtr->setVisible(FALSE);
-		mButtonWifiswPtr->setVisible(FALSE);
-		mTextviewWifiListPtr->setVisible(FALSE);
-		mTextview_loadingPtr->setVisible(FALSE);
+		mTextviewNotSupportPtr->setVisible(true);
+		mTextviewWifiPtr->setVisible(false);
+		mButtonWifiswPtr->setVisible(false);
+		mTextviewWifiListPtr->setVisible(false);
+		mTextview_loadingPtr->setVisible(false);
 	}
 
-	mListviewNetworkPtr->setVisible(FALSE);
+	mListviewNetworkPtr->setVisible(false);
 
 	g_scanResLock.lock();
 	g_vecScanResult.clear();
@@ -265,8 +265,8 @@ static bool onUI_Timer(int id){
 				{
 					if (loadingStatus != isLoading)
 					{
-						mListviewNetworkPtr->setVisible(FALSE);
-						mTextview_loadingPtr->setVisible(TRUE);
+						mListviewNetworkPtr->setVisible(false);
+						mTextview_loadingPtr->setVisible(true);
 					}
 
 					// load pic
@@ -311,13 +311,13 @@ static bool onButtonClick_ButtonWifisw(ZKButton *pButton) {
     //LOGD(" ButtonClick ButtonWifisw !!!\n");
 #ifdef SUPPORT_WLAN_MODULE
 	WIFI_LOG("onButtonClick_ButtonWifisw\n");
-	BOOL bWifiEnable = FALSE;
+	bool bWifiEnable = false;
 	pButton->setSelected(!pButton->isSelected());
 	bWifiEnable = pButton->isSelected();
 	SSTAR_SetWifiEnableStatus(bWifiEnable);
 	mTextviewWifiListPtr->setVisible(bWifiEnable);
 	mTextview_loadingPtr->setVisible(bWifiEnable);
-	mListviewNetworkPtr->setVisible(FALSE);
+	mListviewNetworkPtr->setVisible(false);
 
 	if (bWifiEnable)
 	{
@@ -385,9 +385,9 @@ static void obtainListItemData_ListviewNetwork(ZKListView *pListView,ZKListView:
 	}
 
 	if (bConnected) {
-		pConnectStatusItem->setVisible(TRUE);
+		pConnectStatusItem->setVisible(true);
 	} else {
-		pConnectStatusItem->setVisible(FALSE);
+		pConnectStatusItem->setVisible(false);
 	}
 #endif
 }

@@ -28,8 +28,10 @@
 
 
 #define CMD_BUFFER_SIZE 		512
-#define DEV_NAME_LEN_MIN    	7     // sda/sda*
+#define MULTI_DEV_NAME_LEN_MIN  7     // sda/sda*
+#define DEV_NAME_LEN_MIN    	2     // sd*
 #define USB_PARTTITION_CHECK    "/proc/partitions"
+#define USB_MOUNTS_CHECK    	"/proc/mounts"
 #define USB_MOUNT_DEFAULT_DIR   "/vendor"
 
 typedef struct
@@ -101,60 +103,73 @@ static void *CheckUsbHotPlugProc(void *pdata)
         int len = recv(hotplug_sock, &buf, sizeof(buf), 0);
 
         if (strstr(buf, "sd") && (strlen(strstr(buf, "sd")) > DEV_NAME_LEN_MIN))
-	{
-	    char *pstmsg = strstr(buf, "sd") + strlen("sda/");
-	    UsbParam_t stUsbParam;
-	    memset(&stUsbParam, 0, sizeof(UsbParam_t));
+        {
+        	//printf("\n******** start ********\n\n");
+			//printf("%s\n", buf);
+			//printf("\n******** end ********\n\n");
 
-	    if (strstr(buf, "add"))
-	    {
-		printf("usb add\n");
-		stUsbParam.action = 1;
-		sprintf(stUsbParam.udisk_path, "/vendor/udisk_%s", pstmsg);
+			//char *pstmsg = strstr(buf, "sd") + strlen("sda/");
+			char *pstmsg = buf;
 
-		pthread_mutex_lock(&g_callbackListMutex);
-		list_for_each(pListPos, &g_usbCallbackListHead)
-		{
-		    pstUsbCallbackData = list_entry(pListPos, UsbCallbackListData_t, callbackList);
-	            pstUsbCallbackData->pfnCallback(&stUsbParam);
-		}
-		pthread_mutex_unlock(&g_callbackListMutex);
-	    }
+			if (strlen(strstr(buf, "sd")) > MULTI_DEV_NAME_LEN_MIN)
+				pstmsg = strstr(buf, "sd") + strlen("sda/");
+			else
+				pstmsg = strstr(buf, "sd");
 
-	    if (strstr(buf, "remove"))
-	    {
-	        printf("usb remove\n");
-		stUsbParam.action = 0;
-		sprintf(stUsbParam.udisk_path, "/vendor/udisk_%s", pstmsg);
+			printf("pstmsg is %s\n", pstmsg);
 
-		pthread_mutex_lock(&g_callbackListMutex);
-		list_for_each(pListPos, &g_usbCallbackListHead)
-		{
-		    pstUsbCallbackData = list_entry(pListPos, UsbCallbackListData_t, callbackList);
-		    pstUsbCallbackData->pfnCallback(&stUsbParam);
-		}
-		pthread_mutex_unlock(&g_callbackListMutex);
+			UsbParam_t stUsbParam;
+			memset(&stUsbParam, 0, sizeof(UsbParam_t));
 
-		if (access(stUsbParam.udisk_path, F_OK) == 0)
-		{
-		    //printf("access path:%s \n", stUsbParam.udisk_path);
-		    memset(umountCmd, 0, CMD_BUFFER_SIZE);
-		    sprintf(umountCmd, "umount %s", stUsbParam.udisk_path);
-		    nRet = system(umountCmd);
-		    if (nRet)
-		    {
-			printf("umount  %s failed\n", stUsbParam.udisk_path);
-			continue;
-		    }
+			if (strstr(buf, "add"))
+			{
+				printf("usb add\n");
+				stUsbParam.action = 1;
+				sprintf(stUsbParam.udisk_path, "/vendor/udisk_%s", pstmsg);
 
-		    memset(rmCmd, 0, CMD_BUFFER_SIZE);
-		    sprintf(rmCmd, "rm -rf %s", stUsbParam.udisk_path);
-		    system(rmCmd);
-		}
-	    }
-	}
+				pthread_mutex_lock(&g_callbackListMutex);
+				list_for_each(pListPos, &g_usbCallbackListHead)
+				{
+					pstUsbCallbackData = list_entry(pListPos, UsbCallbackListData_t, callbackList);
+					pstUsbCallbackData->pfnCallback(&stUsbParam);
+				}
+				pthread_mutex_unlock(&g_callbackListMutex);
+			}
 
-    usleep(50000);
+			if (strstr(buf, "remove"))
+			{
+				printf("usb remove\n");
+				stUsbParam.action = 0;
+				sprintf(stUsbParam.udisk_path, "/vendor/udisk_%s", pstmsg);
+
+				pthread_mutex_lock(&g_callbackListMutex);
+				list_for_each(pListPos, &g_usbCallbackListHead)
+				{
+					pstUsbCallbackData = list_entry(pListPos, UsbCallbackListData_t, callbackList);
+					pstUsbCallbackData->pfnCallback(&stUsbParam);
+				}
+				pthread_mutex_unlock(&g_callbackListMutex);
+
+				if (access(stUsbParam.udisk_path, F_OK) == 0)
+				{
+					//printf("access path:%s \n", stUsbParam.udisk_path);
+					memset(umountCmd, 0, CMD_BUFFER_SIZE);
+					sprintf(umountCmd, "umount %s", stUsbParam.udisk_path);
+					nRet = system(umountCmd);
+					if (nRet)
+					{
+						printf("umount  %s failed\n", stUsbParam.udisk_path);
+						continue;
+					}
+
+					memset(rmCmd, 0, CMD_BUFFER_SIZE);
+					sprintf(rmCmd, "rm -rf %s", stUsbParam.udisk_path);
+					system(rmCmd);
+				}
+			}
+        }
+
+        usleep(50000);
     }
 
     printf("close socket\n");
@@ -179,7 +194,8 @@ static char *freadline(FILE *stream)
 
 int USB_CheckCurrentStatus()
 {
-	FILE *pFile = fopen(USB_PARTTITION_CHECK, "r");
+	FILE *pFile = fopen(USB_PARTTITION_CHECK, "r");		// usb mount成功前已经获取了状态，所以通过proc/partitions是否存在节点来判断
+	//FILE *pFile = fopen(USB_MOUNTS_CHECK, "r");
 	char *pCurLine = NULL;
 	char *pSeek = NULL;
 	int nRet = 0;
