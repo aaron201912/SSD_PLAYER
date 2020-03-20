@@ -49,6 +49,7 @@ extern "C"{
 #define PIXEL8888BLUE(pixelval) 	((pixelval) & 0xff)
 
 #define ARGB888_BLACK   ARGB2PIXEL8888(255,0,0,0)
+#define ARGB888_WHITE   ARGB2PIXEL8888(255,255,255,255)
 #define ARGB888_RED     ARGB2PIXEL8888(255,255,0,0)
 #define ARGB888_GREEN   ARGB2PIXEL8888(255,0,255,0)
 #define ARGB888_BLUE    ARGB2PIXEL8888(255,0,0,255)
@@ -78,6 +79,7 @@ int ST_Fb_FillPoint(unsigned short x, unsigned short y, unsigned int u32ColorVal
 int ST_Fb_FillLine(unsigned short x0, unsigned short y0, unsigned short x1, unsigned short y1, unsigned int u32ColorVal);
 int ST_Fb_FillCircle(unsigned short x, unsigned short y, unsigned short r, unsigned int u32ColorVal);
 int ST_Fb_DrawText(unsigned short u16X, unsigned short u16Y, unsigned int u32Color, const char *pText);
+int ST_Fb_DrawPicture(const char *pFilePath);
 int ST_Fb_GetFontSz(unsigned short *pW, unsigned short *pH);
 int ST_Fb_GetLayerSz(unsigned short *pW, unsigned short *pH);
 int ST_Fb_DeInit();

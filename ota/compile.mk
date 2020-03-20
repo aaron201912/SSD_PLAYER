@@ -1,6 +1,8 @@
 .PHONY :all clean gen_exe gen_obj clean_files gen_lib
 
 include $(DB_ALKAID_PROJ)
+
+include $(PROJ_ROOT)/configs/current.configs
 ifneq ($(USE_X86), 1)
 include $(PROJ_ROOT)/release/$(PRODUCT)/$(CHIP)/$(BOARD)/$(TOOLCHAIN)/toolchain.mk
 else
@@ -12,7 +14,7 @@ GCCFLAGS := -Wall -g
 endif
 
 #GCCFLAGS := -Wall -g -Werror
-GCCFLAGS ?= -g -Wall -mthumb -pipe -fPIC
+GCCFLAGS ?= -Wall -g -mthumb -pipe -fPIC
 CXXFLAGS := $(GCCFLAGS) $(LOCAL_CXXFLAGS)
 CXXFLAGS += $(CODEDEFINE) -DLINUX_OS -std=c++11
 CXXFLAGS += $(foreach dir,$(INC),-I$(dir))

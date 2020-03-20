@@ -1,14 +1,14 @@
 ############################################################ source files.
-SUBDIRS:=./$(MODULE)
+SUBDIRS:=$(DB_BUILD_TOP)/$(MODULE)
 
 EXEFILE    := $(MODULE)
 OUTPUT_DIR := $(DB_OUT_PATH)/app
 
 ############################################################ depnedent header files.
 export MOD_ROOT=./$(MODULE)
-include ./st.mk
--include ./$(MODULE)/$(MODULE).mk
-include ./dirs.mk
+include $(DB_BUILD_TOP)/st.mk
+-include $(DB_BUILD_TOP)/$(MODULE)/$(MODULE).mk
+include $(DB_BUILD_TOP)/dirs.mk
 include $(DB_BUILD_TOP)/compile.mk
 
 all: gen_exe

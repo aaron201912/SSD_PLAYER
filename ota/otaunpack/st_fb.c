@@ -32,6 +32,11 @@
 #include "st_fb.h"
 #include "st_font.h"
 
+#include "bmp.h"
+#include "jpeg.h"
+#include "mypng.h"
+#include "raw.h"
+
 struct fb_var_screeninfo vinfo;
 struct fb_fix_screeninfo finfo;
 
@@ -64,7 +69,7 @@ typedef struct ST_FB_DirtyRectangle_s
 
 static ST_FB_DirtyRectangle_t stDirtyRect;
 static pthread_mutex_t _gstFbMutex = PTHREAD_MUTEX_INITIALIZER;
-static unsigned int _gBackGroundColor = ARGB888_BLACK;
+static unsigned int _gBackGroundColor = ARGB888_WHITE;
 
 void printFixedInfo ()
 {
@@ -653,7 +658,132 @@ void convertColorKeyByFmt(MI_FB_ColorKey_t* colorkey)
             break;
         }
 }
+static void CompileFormat(PixelFormat *format, int bpp,
+                   MI_U32 Rmask, MI_U32 Gmask, MI_U32 Bmask, MI_U32 Amask)
+{
+    MI_U32 mask;
 
+    format->alpha = 0xFF;
+
+    switch(bpp) {
+        case 1:
+        case 4:
+        case 8: {
+            assert(0);
+            printf("%s %d unsupport\n", __FUNCTION__, __LINE__);
+        }
+
+        default:
+            format->Rshift = 0;
+            format->Rloss = 8;
+
+            if(Rmask) {
+                for(mask = Rmask; !(mask & 0x01); mask >>= 1)
+                    ++format->Rshift;
+
+                for(; (mask & 0x01); mask >>= 1)
+                    --format->Rloss;
+            }
+
+            format->Gshift = 0;
+            format->Gloss = 8;
+
+            if(Gmask) {
+                for(mask = Gmask; !(mask & 0x01); mask >>= 1)
+                    ++format->Gshift;
+
+                for(; (mask & 0x01); mask >>= 1)
+                    --format->Gloss;
+            }
+
+            format->Bshift = 0;
+            format->Bloss = 8;
+
+            if(Bmask) {
+                for(mask = Bmask; !(mask & 0x01); mask >>= 1)
+                    ++format->Bshift;
+
+                for(; (mask & 0x01); mask >>= 1)
+                    --format->Bloss;
+            }
+
+            format->Ashift = 0;
+            format->Aloss = 8;
+
+            if(Amask) {
+                for(mask = Amask; !(mask & 0x01); mask >>= 1)
+                    ++format->Ashift;
+
+                for(; (mask & 0x01); mask >>= 1)
+                    --format->Aloss;
+            }
+
+            format->Rmask = Rmask;
+            format->Gmask = Gmask;
+            format->Bmask = Bmask;
+            format->Amask = Amask;
+            break;
+    }
+
+    /* Calculate some standard bitmasks, if necessary
+     * Note:  This could conflict with an alpha mask, if given.
+     */
+    if((bpp > 8) && !format->Rmask && !format->Gmask && !format->Bmask) {
+        /* R-G-B */
+        if(bpp > 24)
+            bpp = 24;
+
+        format->Rloss = 8 - (bpp / 3);
+        format->Gloss = 8 - (bpp / 3) - (bpp % 3);
+        format->Bloss = 8 - (bpp / 3);
+        format->Rshift = ((bpp / 3) + (bpp % 3)) + (bpp / 3);
+        format->Gshift = (bpp / 3);
+        format->Bshift = 0;
+        format->Rmask = ((0xFF >> format->Rloss) << format->Rshift);
+        format->Gmask = ((0xFF >> format->Gloss) << format->Gshift);
+        format->Bmask = ((0xFF >> format->Bloss) << format->Bshift);
+
+    }
+}
+
+static void syncFormat(BITMAP *bmp, struct fb_var_screeninfo *vinfo)
+{
+    MI_U32 Rmask;
+    MI_U32 Gmask;
+    MI_U32 Bmask;
+    MI_U32 Amask;
+    int i;
+
+    Rmask = 0;
+
+    for(i = 0; i < vinfo->red.length; ++i) {
+        Rmask <<= 1;
+        Rmask |= (0x00000001 << vinfo->red.offset);
+    }
+
+    Gmask = 0;
+
+    for(i = 0; i < vinfo->green.length; ++i) {
+        Gmask <<= 1;
+        Gmask |= (0x00000001 << vinfo->green.offset);
+    }
+
+    Bmask = 0;
+
+    for(i = 0; i < vinfo->blue.length; ++i) {
+        Bmask <<= 1;
+        Bmask |= (0x00000001 << vinfo->blue.offset);
+    }
+
+    Amask = 0;
+
+    for(i = 0; i < vinfo->transp.length; ++i) {
+        Amask <<= 1;
+        Amask |= (0x00000001 << vinfo->transp.offset);
+    }
+
+    CompileFormat(&bmp->pxFmt, bmp->bmBitsPerPixel, Rmask, Gmask, Bmask, Amask);
+}
 int ST_Fb_Init(void)
 {
     const char *devfile = "/dev/fb0";
@@ -824,6 +954,50 @@ int ST_Fb_DrawText(unsigned short u16X, unsigned short u16Y, unsigned int u32Col
     display_text(dest, u16X, u16Y, stride, u32Color, bytesPerPixel, pText, u16StrLen);
 
     return 0;
+}
+#define LOGO_SUFFIX_RAW ".raw"
+#define LOGO_SUFFIX_JPEG ".jpg"
+#define LOGO_SUFFIX_PNG ".png"
+#define LOGO_SUFFIX_BMP ".png"
+int ST_Fb_DrawPicture(const char *pFilePath)
+{
+    BITMAP fb;
+    FILE *fp;
+    int stride = 0;
+    char *dest = NULL;
+    int bytesPerPixel = 0;
+
+    bytesPerPixel = getBytePerPixel();
+    fb.bmPhyAddr = finfo.smem_start;
+    fb.bmHeight = vinfo.yres;
+    fb.bmWidth = vinfo.xres;
+    fb.bmPitch = finfo.line_length;
+    fb.bmBitsPerPixel =  bytesPerPixel * 8;
+    fb.bmBytesPerPixel = bytesPerPixel ;
+    syncFormat(&fb, &vinfo);
+
+    if((fp = fopen(pFilePath, "r")) == NULL) {
+        fprintf(stderr, "can't open %s\n", pFilePath);
+        return 0;
+    }
+    stride = finfo.line_length;
+    dest = (char *)((char *)(frameBuffer) + vinfo.yoffset * stride + vinfo.xoffset * bytesPerPixel);
+    if(strstr(pFilePath, LOGO_SUFFIX_JPEG) != NULL) {
+        load_logo_jpeg(dest, &fb, fp);
+    } else if(strstr(pFilePath, LOGO_SUFFIX_PNG) != NULL) {
+        load_logo_png(dest, &fb, fp);
+    } else if(strstr(pFilePath, LOGO_SUFFIX_BMP) != NULL) {
+        load_logo_bmp(dest, &fb, fp);
+    } else if(strstr(pFilePath, LOGO_SUFFIX_RAW) != NULL) {
+        load_logo_raw(dest, &fb, fp);
+    } else {
+        fprintf(stderr, "logo format not support");
+        fclose(fp);
+        return 1;
+    }
+    fclose(fp);
+
+    return MI_SUCCESS;
 }
 int ST_Fb_GetFontSz(unsigned short *pW, unsigned short *pH)
 {

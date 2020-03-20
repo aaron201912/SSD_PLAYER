@@ -17,6 +17,8 @@ static void _PrintHelp(void)
     printf("If the package has data to do differential upgrade, you should provide a writable path to store temporary file.\n");
     printf("    otaunpack -r SStarOta.bin -t /tmp\n");
     printf("    otaunpack -x SStarOta.bin.gz -t /tmp\n");
+    printf("Option -p [file] is to show the pictures(jpeg, png) while upgrading\n");
+    printf("    otaunpack -x SStarOta.bin.gz -t /tmp -p logo.jpg\n");
 }
 static void _DrawMainBar(unsigned int barHeight, unsigned int u32Precent, unsigned int u32Color, stRect_t *pRect)
 {
@@ -27,12 +29,26 @@ static void _DrawMainBar(unsigned int barHeight, unsigned int u32Precent, unsign
     pRect->u16Width = layerW * 618 / 1000 * u32Precent / 100;
     pRect->u16Height = barHeight;
     pRect->u16X = (layerW - layerW * 618 / 1000) / 2;
-    pRect->u16Y = layerH * 618 / 1000;
+    pRect->u16Y = layerH * 750 / 1000;
     ST_Fb_FillRect(pRect, u32Color);
 
     return;
 }
-static void _DrawStaticBar(unsigned int barHeight, unsigned int u32Color, stRect_t *pRect)
+static void _DrawSubBar(unsigned int barHeight, unsigned int u32Precent, unsigned int u32Color, stRect_t *pRect)
+{
+    unsigned short layerW = 0;
+    unsigned short layerH = 0;
+
+    ST_Fb_GetLayerSz(&layerW, &layerH);
+    pRect->u16Width = layerW * 618 / 1000 * u32Precent / 100;
+    pRect->u16Height = barHeight;
+    pRect->u16X = (layerW - layerW * 618 / 1000) / 2;
+    pRect->u16Y = layerH * 750 / 1000 - pRect->u16Height - 4;
+    ST_Fb_FillRect(pRect, u32Color);
+
+    return;
+}
+static void _DrawStaticBarMain(unsigned int barHeight, unsigned int u32Color, stRect_t *pRect)
 {
     unsigned short layerW = 0;
     unsigned short layerH = 0;
@@ -41,7 +57,7 @@ static void _DrawStaticBar(unsigned int barHeight, unsigned int u32Color, stRect
     pRect->u16Width = layerW * 618 / 1000;
     pRect->u16Height = barHeight;
     pRect->u16X = (layerW - layerW * 618 / 1000) / 2;
-    pRect->u16Y = layerH * 618 / 1000;
+    pRect->u16Y = layerH * 750 / 1000;
     ST_Fb_FillRect(pRect, u32Color);
 
     return;
@@ -56,8 +72,22 @@ static void _DrawMainText(const char *pText, unsigned int u32Color, stRect_t *pR
     pRect->u16Width *= strlen(pText);
     ST_Fb_GetLayerSz(&layerW, &layerH);
     pRect->u16X = (layerW - layerW * 618 / 1000) / 2;
-    pRect->u16Y = layerH * 618 / 1000 + 4;
+    pRect->u16Y = layerH * 750 / 1000 + 4;
     ST_Fb_DrawText(pRect->u16X, pRect->u16Y, u32Color, pText);
+}
+static void _DrawStaticBarSub(unsigned int barHeight, unsigned int u32Color, stRect_t *pRect)
+{
+    unsigned short layerW = 0;
+    unsigned short layerH = 0;
+
+    ST_Fb_GetLayerSz(&layerW, &layerH);
+    pRect->u16Width = layerW * 618 / 1000;
+    pRect->u16Height = barHeight;
+    pRect->u16X = (layerW - layerW * 618 / 1000) / 2;
+    pRect->u16Y = layerH * 750 / 1000 - pRect->u16Height - 4;
+    ST_Fb_FillRect(pRect, u32Color);
+
+    return;
 }
 static void _DrawSubText(const char *pText, unsigned int u32Color, stRect_t *pRect)
 {
@@ -69,7 +99,7 @@ static void _DrawSubText(const char *pText, unsigned int u32Color, stRect_t *pRe
     pRect->u16Width *= strlen(pText);
     ST_Fb_GetLayerSz(&layerW, &layerH);
     pRect->u16X = (layerW - layerW * 618 / 1000) / 2;
-    pRect->u16Y = layerH * 618 / 1000 - pRect->u16Height;
+    pRect->u16Y = layerH * 750 / 1000 - pRect->u16Height - 4;
     ST_Fb_DrawText(pRect->u16X, pRect->u16Y, u32Color, pText);
 }
 
@@ -78,18 +108,22 @@ static void _NotifyPrecentInfo(const OTA_PROCESS *process, const char *message)
     char print0[128];
     char print1[128];
     unsigned int u32TextColor = 0xFF000000;
-    unsigned int u32SubTextColor = 0xFFFFFFFF;
+    unsigned int u32SubTextColor = 0xFF000000;
     unsigned int u32BarColor = 0xFF00FF00;
-    unsigned int u32StaticBarColor = 0xFFFFFFFF;
+    unsigned int u32StaticBarColor = 0xFF00AEEF;
     static stRect_t stOldRect0;
     static stRect_t stOldRect1;
-    static stRect_t stOldRectBar;
-    static stRect_t stOldStaticBarRect;
+    static stRect_t stOldMainBarRect;
+    static stRect_t stOldStaticMainBarRect;
+    static stRect_t stOldSubBarRect;
+    static stRect_t stOldStaticSubBarRect;
     static int bFirst = 1;
     stRect_t stRect0;
     stRect_t stRect1;
-    stRect_t stBarRect;
-    stRect_t stStaticBarRect;
+    stRect_t stMainBarRect;
+    stRect_t stStaticMainBarRect;
+    stRect_t stSubBarRect;
+    stRect_t stStaticSubBarRect;
     stRect_t stRectCom;
 
     memset(print0, 0, 128);
@@ -160,61 +194,81 @@ static void _NotifyPrecentInfo(const OTA_PROCESS *process, const char *message)
     }
     else
     {
-        ST_Fb_ClearRect(&stOldRectBar);
-        ST_Fb_ClearRect(&stOldStaticBarRect);
+        ST_Fb_ClearRect(&stOldMainBarRect);
+        ST_Fb_ClearRect(&stOldStaticMainBarRect);
+        ST_Fb_ClearRect(&stOldSubBarRect);
+        ST_Fb_ClearRect(&stOldStaticSubBarRect);
         ST_Fb_ClearRect(&stOldRect0);
         ST_Fb_ClearRect(&stOldRect1);
         ST_FB_CombineRect(&stRectCom, &stRectCom, &stOldRect0);
         ST_FB_CombineRect(&stRectCom, &stRectCom, &stOldRect1);
-        ST_FB_CombineRect(&stRectCom, &stRectCom, &stOldRectBar);
-        ST_FB_CombineRect(&stRectCom, &stRectCom, &stOldStaticBarRect);
+        ST_FB_CombineRect(&stRectCom, &stRectCom, &stOldMainBarRect);
+        ST_FB_CombineRect(&stRectCom, &stRectCom, &stOldStaticMainBarRect);
+        ST_FB_CombineRect(&stRectCom, &stRectCom, &stOldSubBarRect);
+        ST_FB_CombineRect(&stRectCom, &stRectCom, &stOldStaticSubBarRect);
+
     }
-    _DrawStaticBar(32, u32StaticBarColor, &stStaticBarRect);
-    _DrawMainBar(32, process->precent_main, u32BarColor, &stBarRect);
+    _DrawStaticBarMain(32, u32StaticBarColor, &stStaticMainBarRect);
+    _DrawMainBar(32, process->precent_main, u32BarColor, &stMainBarRect);
+    _DrawStaticBarSub(32, u32StaticBarColor, &stStaticSubBarRect);
+    _DrawSubBar(32, process->precent_sub, u32BarColor, &stSubBarRect);
     _DrawMainText(print0, u32TextColor, &stRect0);
     _DrawSubText(print1, u32SubTextColor, &stRect1);
-    ST_FB_CombineRect(&stRectCom, &stRectCom, &stBarRect);
-    ST_FB_CombineRect(&stRectCom, &stRectCom, &stStaticBarRect);
+    ST_FB_CombineRect(&stRectCom, &stRectCom, &stMainBarRect);
+    ST_FB_CombineRect(&stRectCom, &stRectCom, &stStaticMainBarRect);
+    ST_FB_CombineRect(&stRectCom, &stRectCom, &stSubBarRect);
+    ST_FB_CombineRect(&stRectCom, &stRectCom, &stStaticSubBarRect);
     ST_FB_CombineRect(&stRectCom, &stRectCom, &stRect0);
     ST_FB_CombineRect(&stRectCom, &stRectCom, &stRect1);
     ST_FB_SyncDirtyUp(&stRectCom);    
     stOldRect0 = stRect0;
     stOldRect1 = stRect1;
-    stOldRectBar = stBarRect;
-    stOldStaticBarRect = stStaticBarRect;
+    stOldMainBarRect= stMainBarRect;
+    stOldStaticMainBarRect = stStaticMainBarRect;
+    stOldSubBarRect= stSubBarRect;
+    stOldStaticSubBarRect = stStaticSubBarRect;
 }
 int main(int argc, char **argv)
 {
     int s32Ret = 0;
     unsigned char u8UpdateChoice = 0;
     char as8BsPatchTmpPath[64];
+    char as8PicturePath[64];
     char as8DstFile[64];
+    stRect_t stRect;
 
-    if (argc != 3 && argc != 5)
+    if (argc == 1)
     {
         _PrintHelp();
         return -1;
     }
     memset(as8BsPatchTmpPath, 0, 64);
-    while ((s32Ret = getopt(argc, argv, "x:r:t:")) != -1)
+    memset(as8PicturePath, 0, 64);
+
+    while ((s32Ret = getopt(argc, argv, "x:r:t:p:")) != -1)
     {
         switch (s32Ret)
         {
             case 'x':
             {
                 u8UpdateChoice = 0;
-                strcpy(as8DstFile, optarg);
+                strncpy(as8DstFile, optarg, 64);
             }
             break;
             case 'r':
             {
                 u8UpdateChoice = 1;
-                strcpy(as8DstFile, optarg);
+                strncpy(as8DstFile, optarg, 64);
             }
             break;
             case 't':
             {
-                strcpy(as8BsPatchTmpPath, optarg);
+                strncpy(as8BsPatchTmpPath, optarg, 64);
+            }
+            break;
+            case 'p':
+            {
+                strncpy(as8PicturePath, optarg, 64);
             }
             break;
             default:
@@ -222,7 +276,17 @@ int main(int argc, char **argv)
                 return -1;
         }
     }
+    if (strlen(as8DstFile) == 0)
+    {
+        _PrintHelp();
+        return -1;
+    }
     ST_Fb_Init();
+    stRect.u16X = 0;
+    stRect.u16Y = 0;
+    ST_Fb_GetLayerSz(&stRect.u16Width, &stRect.u16Height);
+    ST_Fb_DrawPicture(as8PicturePath);        
+    ST_FB_SyncDirtyUp(&stRect);
     s32Ret = OtaUnPack(as8DstFile, as8BsPatchTmpPath, u8UpdateChoice, _NotifyPrecentInfo);
     ST_Fb_Deinit();
 
