@@ -1,5 +1,5 @@
 /*
-* st_fb.c- Sigmastar
+* st_font.c- Sigmastar
 *
 * Copyright (C) 2018 Sigmastar Technology Corp.
 *

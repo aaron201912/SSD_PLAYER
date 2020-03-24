@@ -1,3 +1,20 @@
+/*
+* main.c- Sigmastar
+*
+* Copyright (C) 2018 Sigmastar Technology Corp.
+*
+* Author: malloc.peng <malloc.peng@sigmastar.com.cn>
+*
+* This software is licensed under the terms of the GNU General Public
+* License version 2, as published by the Free Software Foundation, and
+* may be copied, distributed, and modified under those terms.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+*/
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -641,11 +658,11 @@ int main(int argc, char **argv)
         return -1;
     }
     ST_Fb_Init();
-    stRect.u16X = 0;
-    stRect.u16Y = 0;
-    ST_Fb_GetLayerSz(&stRect.u16Width, &stRect.u16Height);
     if (strlen(as8PicturePath))
     {
+        stRect.u16X = 0;
+        stRect.u16Y = 0;
+        ST_Fb_GetLayerSz(&stRect.u16Width, &stRect.u16Height);
         ST_FB_SyncDirtyDown();
         ST_Fb_DrawPicture(as8PicturePath);        
         ST_FB_SyncDirtyUp(&stRect);
