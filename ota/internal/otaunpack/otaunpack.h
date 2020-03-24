@@ -23,12 +23,55 @@ typedef struct
     unsigned int precent_main;
     OTA_PROCESS_STATE state_sub;
     unsigned int precent_sub;
-}OTA_PROCESS;
+}OTA_Process_e;
+typedef int (*OtaFileOpen)(const char *pFilePath);
+typedef int (*OtaUbiVolOpen)(const char *pFilePath, unsigned int u32FileSize);
+typedef int (*OtaFileCreate)(const char *pFilePath, int s32Mode);
+typedef int (*OtaFileDelete)(const char *pFilePath);
+typedef int (*OtaFileClose)(int fd);
+typedef int (*OtaFileRead)(int fd, char *pBuf, int size);
+typedef int (*OtaFileWrite)(int fd, char *pBuf, int size);
+typedef int (*OtaGetBufSize)(void);
+typedef int (*OtaRunDiffPatch)(const char *pOldFile, const char *pNewFile, const char *pPatchFile);
+typedef int (*OtaRunScripts)(const char *pScripts, int s32DataSize);
 
-typedef void (*OtaUnpackNotifyProcess)(const OTA_PROCESS *process, const char *message);
+typedef struct
+{
+    OtaFileOpen fpFileOpen;
+    OtaFileClose fpFileClose;
+    OtaFileRead fpFileRead;
+}OTA_SrcFileOperation_t;
+typedef struct
+{
+    OtaFileOpen fpFileOpen;
+    OtaFileCreate fpFileCreate;
+    OtaFileDelete fpFileDelete;
+    OtaUbiVolOpen fpUbiFileOpen;
+    OtaFileClose fpFileClose;
+    OtaFileWrite fpFileWrite;
+}OTA_DstFileOperation_t;
 
+typedef void (*OtaNotifyProcess)(const OTA_Process_e *process, const char *message);
+typedef struct
+{
+    const char *pSrcFile;
+    const char *pDiffPatchPath;
+    int isCompress;
+    union
+    {
+        OTA_SrcFileOperation_t stInputNormalFile;
+        OTA_SrcFileOperation_t stInputCompressedFile;
+    };
+    OTA_DstFileOperation_t stBlockUpgrade; 
+    OTA_DstFileOperation_t stUbiUpgrade; 
+    OTA_DstFileOperation_t stFileUpgrade;
+    OtaRunDiffPatch fpRunDiffPatch;
+    OtaRunScripts fpRunScripts;
+    OtaGetBufSize fpGetBufSize;
+    OtaNotifyProcess fpProcess;
+}OTA_UserInterface_t;
 
-int OtaUnPack(const char* file, const char* bspatch_path, int is_compressed, OtaUnpackNotifyProcess process_func);
+int OtaUnPack(OTA_UserInterface_t *user);
 
 #ifdef __cplusplus
 }
