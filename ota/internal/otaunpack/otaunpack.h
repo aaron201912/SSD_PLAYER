@@ -17,7 +17,7 @@
 
 #ifdef __cplusplus
 extern "C"{
-#endif	// __cplusplus
+#endif // __cplusplus
 
 typedef enum
 {
@@ -89,5 +89,5 @@ int OtaUnPack(OTA_UserInterface_t *user);
 
 #ifdef __cplusplus
 }
-#endif	// __cplusplus
+#endif // __cplusplus
 #endif //__OTAUNPACK__
