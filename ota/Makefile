@@ -1,6 +1,7 @@
 DB_BUILD_TOP:=$(shell pwd)
 DB_OUT_PATH:=$(DB_BUILD_TOP)/out
 DB_ALKAID_PROJ:=/home/malloc.peng/p2_sdk/project/configs/current.configs
+DB_3PARTY_PATH:=$(DB_BUILD_TOP)/3rdparty
 include $(DB_ALKAID_PROJ)
 -include $(MODULE)/$(MODULE).mk
 ifneq ($(USE_X86), 1)
@@ -30,6 +31,7 @@ MODULES_OBJS_CLEAN := $(foreach m,$(INTERNAL_LIBS),$(m)_obj_clean)
 MODULES_LIBS_ALL := $(foreach m,$(INTERNAL_LIBS),$(m)_lib_all)
 MODULES_LIBS_CLEAN := $(foreach m,$(INTERNAL_LIBS),$(m)_lib_clean)
 MODULES_INSTALL := $(foreach m,$(MODULES),$(m)_install)
+3RD_PARTY := $(foreach m,$(notdir $(wildcard $(DB_3PARTY_PATH)/*)),$(m)_3rd_party_all)
 
 export PROJ_ROOT CHIP PRODUCT BOARD TOOLCHAIN TOOLCHAIN_VERSION TOOLCHAIN_REL KERNEL_VERSION CUSTOMER_OPTIONS MOD_PREFIX INTERFACE_ENABLED INTERFACE_DISABLED MHAL_ENABLED MHAL_DISABLED
 export DB_BUILD_TOP
@@ -38,13 +40,19 @@ export DB_PROJECT
 export DB_ALKAID_PROJ
 export TARGET_OUT
 export LIBS_PATH
+export DB_3PARTY_PATH
 
-.PHONY: all lib obj clean $(MODULES) $(MODULES_CLEAN) $(MODULES_APP_ALL) $(MODULES_APP_CLEAN) $(MODULES_OBJS_ALL) $(MODULES_OBJS_CLEAN) $(MODULES_LIBS_ALL) $(MODULES_LIBS_CLEAN)
+.PHONY: all lib obj clean install depend_internal depend_internal_clean depend_3rd_party $(MODULES) $(MODULES_CLEAN) $(MODULES_APP_ALL) $(MODULES_APP_CLEAN) $(MODULES_OBJS_ALL) $(MODULES_OBJS_CLEAN) $(MODULES_LIBS_ALL) $(MODULES_LIBS_CLEAN)
+
+-include $(foreach mod,$(MODULES_IN),$(mod)/dep.mk)
 
 all:
-	$(foreach mod,$(MODULES),$(MAKE) $(mod);)
+	$(MAKE) MODULES_IN="$(MODULES)" depend_3rd_party
+	#$(MAKE) MODULES_IN="$(MODULES)" depend_internal
+	$(MAKE) $(MODULES_APP_ALL)
 clean:
-	$(foreach mod,$(MODULES),$(MAKE) $(patsubst %,%_clean,$(mod));)
+	$(MAKE) $(foreach mod,$(MODULES),$(patsubst %,%_clean,$(mod)))
+	#$(MAKE) MODULES_IN="$(MODULES)" depend_internal_clean
 	@rm -rvf MakefileTmp_*
 	@rm $(DB_OUT_PATH) -rf
 	@rm ./obj/ -rf
@@ -53,16 +61,21 @@ install:
 	@mkdir -p $(PROJ_ROOT)/release/$(PRODUCT)/$(CHIP)/common/$(TOOLCHAIN)/$(TOOLCHAIN_VERSION)/bin/mi_demo/
 	@$(MAKE) $(MODULES_INSTALL)
 
-module_all:
+depend_internal:
 ifneq ($(DEP), )
-	#@$(MAKE) $(foreach m,$(DEP),$(m)_obj_all)
-	#@$(MAKE) $(foreach m,$(DEP),$(m)_lib_all)
+	$(MAKE) $(foreach m,$(sort $(DEP)),$(m)_obj_all)
+	$(MAKE) $(foreach m,$(sort $(DEP)),$(m)_lib_all)
 endif
 
-module_clean:
+depend_internal_clean:
 ifneq ($(DEP), )
-	#@$(MAKE) $(foreach m,$(DEP),$(m)_obj_clean)
-	#@$(MAKE) $(foreach m,$(DEP),$(m)_lib_clean)
+	$(MAKE) $(foreach m,$(sort $(DEP)),$(m)_obj_clean)
+	$(MAKE) $(foreach m,$(sort $(DEP)),$(m)_lib_clean)
+endif
+
+depend_3rd_party:
+ifneq ($(3RD_PARTY_DEP), )
+	$(MAKE) $(foreach m,$(sort $(3RD_PARTY_DEP)),$(m)_3rd_party_all)
 endif
 
 module_install:
@@ -72,16 +85,24 @@ module_install:
 ifneq ($(MODULE_REL_FILES), )
 	$(foreach n,$(MODULE_REL_FILES),cp -rfv $(n) $(PROJ_ROOT)/release/$(PRODUCT)/$(CHIP)/common/$(TOOLCHAIN)/$(TOOLCHAIN_VERSION)/bin/mi_demo/$(MODULE)/;)
 endif
+
+$(3RD_PARTY):
+	cd $(DB_3PARTY_PATH)/$(patsubst %_3rd_party_all,%,$@)/;	\
+	var="$(TOOLCHAIN_REL)";\
+	./build.sh $${var%?};	\
+	cd -
+
 $(MODULES_INSTALL):
 	@$(MAKE) MODULE=$(patsubst %_install,%,$@) module_install
 
 $(MODULES):
-	@$(MAKE) MODULE=$@ module_all
+	$(MAKE) MODULES_IN=$@ depend_3rd_party
+	$(MAKE) MODULES_IN=$@ depend_internal
 	@$(MAKE) $(patsubst %,%_app_all,$@)
 
 $(MODULES_CLEAN):
 	@$(MAKE) $(patsubst %_clean,%_app_clean,$@)
-	@$(MAKE) MODULE=$(patsubst %_clean,%,$@) module_clean
+	$(MAKE) MODULES_IN=$@ depend_internal_clean
 
 $(MODULES_APP_ALL):
 	@$(MAKE) MODULE=$(patsubst %_app_all,%,$@) -f ./MakeApp.mk all

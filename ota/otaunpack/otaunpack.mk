@@ -12,6 +12,3 @@ SUBDIRS += $(MOD_ROOT)/png
 SUBDIRS += $(MOD_ROOT)/raw
 
 LIBS += -L$(DB_BUILD_TOP)/3rdparty/lib/$(TOOLCHAIN)/$(TOOLCHAIN_VERSION)/$(LINK_TYPE)
-LIBS += -ljpeg -lpng -lz
-
-DEP := otaunpack

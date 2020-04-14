@@ -70,7 +70,7 @@ ifneq ($(OUTPUT_DIR), )
 endif
 endif
 ifeq ($(LIB_TYPE), dynamic)
-	$(CC) -shared -fPIC -o lib$(LIB_NAME).so $(OBJ_FILES)
+	@$(CC) -shared -fPIC -o lib$(LIB_NAME).so $(OBJ_FILES)
 ifneq ($(OUTPUT_DIR), )
 	@mkdir -p $(OUTPUT_DIR)
 	@mv ./lib$(LIB_NAME).so $(OUTPUT_DIR) -v
