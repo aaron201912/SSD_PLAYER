@@ -354,6 +354,12 @@ typedef struct
     MI_U16 u16GpioEN;
 }MI_PANEL_GpioConfig_t;
 
+typedef struct
+{
+    MI_U16 u16PwmPinIndex;
+    MI_U16 u16PwmMode;
+}MI_PANEL_PwmConfig_t;
+
 #ifdef __cplusplus
 }
 #endif

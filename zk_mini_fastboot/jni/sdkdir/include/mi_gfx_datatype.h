@@ -132,6 +132,37 @@ typedef struct MI_GFX_Rect_s
     MI_U32 u32Height;
 } MI_GFX_Rect_t;
 
+//=============================================================================
+// GFX palette information
+//=============================================================================
+
+typedef union
+{
+    /// ARGB8888 byte order
+    struct
+    {
+        MI_U8 u8A;
+        MI_U8 u8R;
+        MI_U8 u8G;
+        MI_U8 u8B;
+    } RGB;
+    // u8Data[0] = u8A
+    // u8Data[1] = u8R
+    // u8Data[2] = u8G
+    // u8Data[3] = u8B
+    MI_U8 u8Data[4];
+} MI_GFX_PaletteEntry_t;
+
+typedef struct MI_GFX_Palette_s
+{
+    /// array subscripts are indentical to value of Index Color
+    MI_GFX_PaletteEntry_t aunPalette[256];
+    /// Starting Index in palette to config
+    MI_U16 u16PalStart;
+    /// Ending Index in palette to config
+    MI_U16 u16PalEnd;
+}MI_GFX_Palette_t;
+
 typedef struct MI_GFX_ColorKey_s
 {
     MI_U32 u32ColorStart;
