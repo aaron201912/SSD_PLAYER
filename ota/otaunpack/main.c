@@ -33,7 +33,7 @@
 #include "st_fb.h"
 #include "otaunpack.h"
 
-#define BUF_SIZE_BYTE 128
+#define BUF_SIZE_BYTE 4096
 #define OTA_FILE_NAME_LENGTH 256
 
 static void _PrintHelp(void)
@@ -140,7 +140,7 @@ static int _OpenFile(const char *pFilePath)
     if (s32Fd < 0)
     {
         perror("open");
-    
+
         return -1;
     }
 
@@ -148,6 +148,7 @@ static int _OpenFile(const char *pFilePath)
 }
 static int _CloseFile(int s32Fd)
 {
+    fsync(s32Fd);
     return close(s32Fd);
 }
 static int _FileRead(int fd, char *pBuf, int size)
@@ -204,7 +205,7 @@ static int _FileLockSet(int fd, int type)
     lock.l_len = 0;
     lock.l_type = type;
     lock.l_pid = -1;
-    
+
     fcntl(fd, F_GETLK, &lock);
     if (lock.l_type != F_UNLCK)
     {
@@ -217,16 +218,16 @@ static int _FileLockSet(int fd, int type)
         {
             fprintf(stderr, "Write lock already set by %d\n", lock.l_pid);
             return -1;
-        }            
+        }
     }
-    
+
     lock.l_type = type;
     if ((fcntl(fd, F_SETLKW, &lock)) < 0)
     {
         fprintf(stderr, "Lock failed:type = %d\n", lock.l_type);
         return 1;
     }
-        
+
     switch(lock.l_type)
     {
         case F_RDLCK:
@@ -258,14 +259,14 @@ static int _OpenCompressedFile(const char *pOpenData)
     if (pipe(s32Fd) < 0)
     {
         perror("pipe");
-    
+
         return -1;
     }
     gs32FdTmp = dup(STDOUT_FILENO);
     if (gs32FdTmp < 0)
     {
         perror("dup");
-    
+
         return -1;
     }
     if (dup2(s32Fd[1], STDOUT_FILENO) < 0)
@@ -274,7 +275,7 @@ static int _OpenCompressedFile(const char *pOpenData)
         close(s32Fd[0]);
         close(s32Fd[1]);
         close(gs32FdTmp);
-    
+
         return -1;
     }
     _FileLockSet(STDOUT_FILENO, F_WRLCK);
@@ -301,7 +302,7 @@ static int _OpenCompressedFile(const char *pOpenData)
                 close(gs32FdTmp);
 
                 exit(-1);
-            }            
+            }
             close(s32Fd[1]);
             close(gs32FdTmp);
             exit(0);
@@ -316,7 +317,7 @@ static int _OpenCompressedFile(const char *pOpenData)
 }
 static int _CloseCompressedFile(int s32Fd)
 {
-    
+
     kill(fPid, SIGKILL);
     waitpid(fPid, NULL, 0);
     _FileLockSet(STDOUT_FILENO, F_UNLCK);
@@ -325,7 +326,7 @@ static int _CloseCompressedFile(int s32Fd)
         perror("dup2");
         close(s32Fd);
         close(gs32FdTmp);
-    
+
         return -1;
     }
     close(s32Fd);
@@ -338,12 +339,28 @@ static int _OpenBlockFile(const char *pOpenData)
     if (s32Fd < 0)
     {
         perror("open");
-    
+
         return -1;
     }
 
     return s32Fd;
 }
+int _GetBlockSize(const char *pBlockPath)
+{
+    int intSize = 0;
+    int s32Fd = open(pBlockPath, O_RDONLY);
+    if (s32Fd < 0)
+    {
+        perror("open");
+
+        return -1;
+    }
+    intSize = lseek(s32Fd, 0, SEEK_END);
+    close(s32Fd);
+
+    return intSize;
+}
+
 static int _OpenUbiDev(const char *pOpenData, unsigned int size)
 {
     unsigned long long u64UbiVolSize = (unsigned long long)size;
@@ -352,7 +369,7 @@ static int _OpenUbiDev(const char *pOpenData, unsigned int size)
     if (s32Fd < 0)
     {
         perror("open");
-    
+
         return -1;
     }
     ioctl(s32Fd, UBI_IOCVOLUP, &u64UbiVolSize);
@@ -365,7 +382,7 @@ static int _OpenNormalFile(const char *pOpenData)
     if (s32Fd < 0)
     {
         perror("open");
-    
+
         return -1;
     }
 
@@ -377,7 +394,7 @@ static int _CreateNormalFile(const char *pFile, int s32Mode)
     char s8Dir[OTA_FILE_NAME_LENGTH];
     char *pFileNameLocate = NULL;
     char *pTmp = NULL;
-    
+
     memset(s8MkdirCmd, 0, OTA_FILE_NAME_LENGTH);
     memset(s8Dir, 0, OTA_FILE_NAME_LENGTH);
     strcpy(s8Dir, pFile);
@@ -398,7 +415,7 @@ static int _CreateNormalFile(const char *pFile, int s32Mode)
     if (s32Fd < 0)
     {
         perror("open");
-    
+
         return -1;
     }
 
@@ -427,7 +444,7 @@ static int _RunBsPatch(const char *s8OldFile, const char *s8NewFile, const char 
             {
                 perror("execlp error!");
                 exit(-1);
-            }            
+            }
             exit(s32Ret);
         }
         default:
@@ -436,7 +453,7 @@ static int _RunBsPatch(const char *s8OldFile, const char *s8NewFile, const char 
             if (s32Ret < 0)
             {
                 fprintf(stderr, "bspatch exec error\n");
-                
+
                 return -1;
             }
         }
@@ -595,7 +612,7 @@ static void _NotifyPrecentInfo(const OTA_Process_e *process, const char *message
     ST_FB_CombineRect(&stRectCom, &stRectCom, &stStaticSubBarRect);
     ST_FB_CombineRect(&stRectCom, &stRectCom, &stRect0);
     ST_FB_CombineRect(&stRectCom, &stRectCom, &stRect1);
-    ST_FB_SyncDirtyUp(&stRectCom);    
+    ST_FB_SyncDirtyUp(&stRectCom);
     stOldRect0 = stRect0;
     stOldRect1 = stRect1;
     stOldMainBarRect= stMainBarRect;
@@ -664,28 +681,28 @@ int main(int argc, char **argv)
         stRect.u16Y = 0;
         ST_Fb_GetLayerSz(&stRect.u16Width, &stRect.u16Height);
         ST_FB_SyncDirtyDown();
-        ST_Fb_DrawPicture(as8PicturePath);        
+        ST_Fb_DrawPicture(as8PicturePath);
         ST_FB_SyncDirtyUp(&stRect);
     }
-    memset(&stOtaApi, 0, sizeof(OTA_UserInterface_t));    
-    stOtaApi.isCompress = u8UpdateChoice;
-    if (stOtaApi.isCompress)
+    memset(&stOtaApi, 0, sizeof(OTA_UserInterface_t));
+    if (u8UpdateChoice)
     {
-        stOtaApi.stInputCompressedFile.fpFileOpen = _OpenCompressedFile;
-        stOtaApi.stInputCompressedFile.fpFileClose = _CloseCompressedFile;
-        stOtaApi.stInputCompressedFile.fpFileRead = _FileRead;
+        stOtaApi.stInputFile.fpFileOpen = _OpenCompressedFile;
+        stOtaApi.stInputFile.fpFileClose = _CloseCompressedFile;
+        stOtaApi.stInputFile.fpFileRead = _FileRead;
     }
     else
     {
-        stOtaApi.stInputNormalFile.fpFileOpen = _OpenFile;
-        stOtaApi.stInputNormalFile.fpFileClose = _CloseFile;
-        stOtaApi.stInputNormalFile.fpFileRead = _FileRead;
+        stOtaApi.stInputFile.fpFileOpen = _OpenFile;
+        stOtaApi.stInputFile.fpFileClose = close;
+        stOtaApi.stInputFile.fpFileRead = _FileRead;
     }
     stOtaApi.stBlockUpgrade.fpFileOpen = _OpenBlockFile;
     stOtaApi.stBlockUpgrade.fpFileClose = _CloseFile;
     stOtaApi.stBlockUpgrade.fpFileWrite= _FileWrite;
-    stOtaApi.stUbiUpgrade.fpUbiFileOpen = _OpenUbiDev;
-    stOtaApi.stUbiUpgrade.fpFileClose = _CloseFile;
+    stOtaApi.stBlockUpgrade.fpGetSize = _GetBlockSize;
+    stOtaApi.stUbiUpgrade.fpFileOpen = _OpenUbiDev;
+    stOtaApi.stUbiUpgrade.fpFileClose = close;
     stOtaApi.stUbiUpgrade.fpFileWrite= _FileWrite;
     stOtaApi.stFileUpgrade.fpFileOpen = _OpenNormalFile;
     stOtaApi.stFileUpgrade.fpFileCreate = _CreateNormalFile;

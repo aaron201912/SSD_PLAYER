@@ -48,6 +48,7 @@ typedef int (*OtaFileWrite)(int fd, char *pBuf, int size);
 typedef int (*OtaGetBufSize)(void);
 typedef int (*OtaRunDiffPatch)(const char *pOldFile, const char *pNewFile, const char *pPatchFile);
 typedef int (*OtaRunScripts)(const char *pScripts, int s32DataSize);
+typedef int (*OtaGetBlockSize)(const char *pBlockPath);
 
 typedef struct
 {
@@ -60,24 +61,30 @@ typedef struct
     OtaFileOpen fpFileOpen;
     OtaFileCreate fpFileCreate;
     OtaFileDelete fpFileDelete;
-    OtaUbiVolOpen fpUbiFileOpen;
     OtaFileClose fpFileClose;
     OtaFileWrite fpFileWrite;
 }OTA_DstFileOperation_t;
-
+typedef struct
+{
+    OtaFileOpen fpFileOpen;
+    OtaFileClose fpFileClose;
+    OtaFileWrite fpFileWrite;
+    OtaGetBlockSize fpGetSize;
+}OTA_DstBlockOperation_t;
+typedef struct
+{
+    OtaUbiVolOpen fpFileOpen;
+    OtaFileClose fpFileClose;
+    OtaFileWrite fpFileWrite;
+}OTA_DstUbiOperation_t;
 typedef void (*OtaNotifyProcess)(const OTA_Process_e *process, const char *message);
 typedef struct
 {
     const char *pSrcFile;
     const char *pDiffPatchPath;
-    int isCompress;
-    union
-    {
-        OTA_SrcFileOperation_t stInputNormalFile;
-        OTA_SrcFileOperation_t stInputCompressedFile;
-    };
-    OTA_DstFileOperation_t stBlockUpgrade;
-    OTA_DstFileOperation_t stUbiUpgrade;
+    OTA_SrcFileOperation_t stInputFile;
+    OTA_DstBlockOperation_t stBlockUpgrade;
+    OTA_DstUbiOperation_t stUbiUpgrade;
     OTA_DstFileOperation_t stFileUpgrade;
     OtaRunDiffPatch fpRunDiffPatch;
     OtaRunScripts fpRunScripts;
