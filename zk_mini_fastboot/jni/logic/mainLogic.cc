@@ -235,7 +235,6 @@ const char* IconTab[]={
 		"testButtonActivity",
 		"inputtextActivity",
 		"waveViewActivity",
-		"testpointerActivity",
 		"windowActivity",
 		"tesListActivity",
 		"video2Activity",

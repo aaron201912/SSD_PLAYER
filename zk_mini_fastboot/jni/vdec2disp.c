@@ -163,7 +163,7 @@ void* SSTAR_aoSendFrame(void* data)
                 break;
             }
         }
-        
+
         memset(&stAoSendFrame, 0x0, sizeof(MI_AUDIO_Frame_t));
         stAoSendFrame.u32Len = s32Ret;
         stAoSendFrame.apVirAddr[0] = u8TempBuf;
@@ -177,7 +177,7 @@ void* SSTAR_aoSendFrame(void* data)
         {
             printf("[Warning]: MI_AO_SendFrame fail, error is 0x%x: \n", s32Ret);
         }
-		
+
     }
     if (g_AoReadFd > 0)
     {
@@ -638,6 +638,10 @@ void *SSTAR_VdecSendStream(void *args)
     printf("\n\n");
     usleep(300000);
     free(pu8Buf);
+    if(g_pStreamFile[vdecChn])
+    {
+	fclose(g_pStreamFile[vdecChn]);
+    }
     printf("End----------------------%d------------------End\n", stChnPort.u32ChnId);
 
     return NULL;

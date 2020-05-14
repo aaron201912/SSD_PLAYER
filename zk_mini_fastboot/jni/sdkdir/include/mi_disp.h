@@ -72,7 +72,7 @@ MI_S32 MI_DISP_SetCvbsParam(MI_DISP_DEV DispDev, MI_DISP_CvbsParam_t *pstCvbsPar
 MI_S32 MI_DISP_DeviceSetColorTempeture(MI_DISP_DEV DispDev, MI_DISP_ColorTemperature_t *pstColorTempInfo);
 MI_S32 MI_DISP_DeviceGetColorTempeture(MI_DISP_DEV DispDev, MI_DISP_ColorTemperature_t *pstColorTempInfo);
 MI_S32 MI_DISP_DeviceSetGammaParam(MI_DISP_DEV DispDev, MI_DISP_GammaParam_t * pstGammaParam);
-MI_S32 MI_DISP_ClearInputPortBuffer(MI_DISP_LAYER DispLayer, MI_DISP_INPUTPORT LayerInputPort);
+MI_S32 MI_DISP_ClearInputPortBuffer(MI_DISP_LAYER DispLayer, MI_DISP_INPUTPORT LayerInputPort, MI_BOOL bClrAll);
 MI_S32 MI_DISP_SetVideoLayerRotateMode(MI_DISP_LAYER DispLayer, MI_DISP_RotateConfig_t *pstRotateConfig);
 
 #ifdef __cplusplus
