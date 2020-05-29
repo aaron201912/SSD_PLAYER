@@ -2,6 +2,10 @@
 /gen auto by zuitools
 ***********************************************/
 #include "mainActivity.h"
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <fcntl.h>
 
 /*TAG:GlobalVariable全局变量*/
 static ZKListView* mListview_indicatorPtr;
@@ -14,8 +18,8 @@ static mainActivity* mActivityPtr;
 REGISTER_ACTIVITY(mainActivity);
 
 typedef struct {
-	int id; // 定时器ID ， 不能重复
-	int time; // 定时器  时间间隔  单位 毫秒
+    int id; // 定时器ID ， 不能重复
+    int time; // 定时器  时间间隔  单位 毫秒
 }S_ACTIVITY_TIMEER;
 
 #include "logic/mainLogic.cc"
@@ -116,14 +120,81 @@ static S_VideoViewCallback SVideoViewCallbackTab[] = {
 };
 
 
+typedef enum
+{
+  IPC_KEYEVENT = 0,
+  IPC_COMMAND,
+  IPC_LOGCMD,
+  IPC_EVENT_MAX,
+} IPC_EVENT_TYPE;
+
+typedef enum
+{
+  IPC_COMMAND_EXIT = 0,
+  IPC_COMMAND_SUSPEND,
+  IPC_COMMAND_RESUME,
+  IPC_COMMAND_RELOAD,
+  IPC_COMMAND_BROWN_GETFOCUS,
+  IPC_COMMAND_BROWN_LOSEFOCUS,
+  IPC_COMMAND_APP_START_DONE,
+  IPC_COMMAND_APP_STOP_DONE,
+  IPC_COMMAND_SETUP_WATERMARK,
+  IPC_COMMAND_APP_START,
+  IPC_COMMAND_APP_STOP,
+  IPC_COMMAND_MAX,
+} IPC_COMMAND_TYPE;
+
+typedef struct {
+  uint32_t EventType;
+  uint32_t Data;
+  char StrData[256];
+} IPCEvent;
+
+#define SVC_IPC "/tmp/brown_svc_input"
+
+class IPCOutput {
+public:
+  IPCOutput(const std::string& file):m_fd(-1), m_file(file) {
+  }
+
+  virtual ~IPCOutput() {
+    Term();
+  }
+
+  bool Init() {
+    if (m_fd < 0) {
+      m_fd = open(m_file.c_str(), O_WRONLY | O_NONBLOCK);
+    }
+    return m_fd >= 0;
+  }
+
+  void Term() {
+    if (m_fd >= 0) {
+      close(m_fd);
+      m_fd = -1;
+    }
+  }
+
+  void Send(const IPCEvent& evt) {
+    if (m_fd >= 0) {
+      write(m_fd, &evt, sizeof(IPCEvent));
+    }
+  }
+
+private:
+  int m_fd;
+  std::string m_file;
+};
+
+
 mainActivity::mainActivity() {
-	//todo add init code here
-	mVideoLoopIndex = 0;
-	mVideoLoopErrorCount = 0;
+    //todo add init code here
+    mVideoLoopIndex = 0;
+    mVideoLoopErrorCount = 0;
 }
 
 mainActivity::~mainActivity() {
-	//todo add init file here
+    //todo add init file here
     // 退出应用时需要反注册
     EASYUICONTEXT->unregisterGlobalTouchListener(this);
     onUI_quit();
@@ -131,30 +202,30 @@ mainActivity::~mainActivity() {
 }
 
 const char* mainActivity::getAppName() const{
-	return "main.ftu";
+    return "main.ftu";
 }
 
 //TAG:onCreate
 void mainActivity::onCreate() {
-	Activity::onCreate();
+    Activity::onCreate();
     mSlidewindow1Ptr = (ZKSlideWindow*)findControlByID(ID_MAIN_Slidewindow1);if(mSlidewindow1Ptr!= NULL){mSlidewindow1Ptr->setSlideItemClickListener(this);}
     mListview_indicatorPtr = (ZKListView*)findControlByID(ID_MAIN_Listview_indicator);if(mListview_indicatorPtr!= NULL){mListview_indicatorPtr->setListAdapter(this);mListview_indicatorPtr->setItemClickListener(this);}
     mDigitalclock2Ptr = (ZKDigitalClock*)findControlByID(ID_MAIN_Digitalclock2);
     mWindow2Ptr = (ZKWindow*)findControlByID(ID_MAIN_Window2);
     mSlidewindow1Ptr = (ZKSlideWindow*)findControlByID(ID_MAIN_Slidewindow1);if(mSlidewindow1Ptr!= NULL){mSlidewindow1Ptr->setSlideItemClickListener(this);mSlidewindow1Ptr->setSlidePageChangeListener(this);}
-	mActivityPtr = this;
-	onUI_init();
+    mActivityPtr = this;
+    onUI_init();
     registerProtocolDataUpdateListener(onProtocolDataUpdate); 
     rigesterActivityTimer();
 }
 
 void mainActivity::onClick(ZKBase *pBase) {
-	//TODO: add widget onClik code 
+    //TODO: add widget onClik code 
     int buttonTablen = sizeof(sButtonCallbackTab) / sizeof(S_ButtonCallback);
     for (int i = 0; i < buttonTablen; ++i) {
         if (sButtonCallbackTab[i].id == pBase->getID()) {
             if (sButtonCallbackTab[i].callback((ZKButton*)pBase)) {
-            	return;
+                return;
             }
             break;
         }
@@ -169,30 +240,30 @@ void mainActivity::onClick(ZKBase *pBase) {
         }
     }
 
-	Activity::onClick(pBase);
+    Activity::onClick(pBase);
 }
 
 void mainActivity::onResume() {
-	Activity::onResume();
-	EASYUICONTEXT->registerGlobalTouchListener(this);
-	startVideoLoopPlayback();
-//	onUI_show();
+    Activity::onResume();
+    EASYUICONTEXT->registerGlobalTouchListener(this);
+    startVideoLoopPlayback();
+//  onUI_show();
 }
 
 void mainActivity::onPause() {
-	Activity::onPause();
-	EASYUICONTEXT->unregisterGlobalTouchListener(this);
-	stopVideoLoopPlayback();
-//	onUI_hide();
+    Activity::onPause();
+    EASYUICONTEXT->unregisterGlobalTouchListener(this);
+    stopVideoLoopPlayback();
+//  onUI_hide();
 }
 
 void mainActivity::onIntent(const Intent *intentPtr) {
-	Activity::onIntent(intentPtr);
-//	onUI_intent(intentPtr);
+    Activity::onIntent(intentPtr);
+//  onUI_intent(intentPtr);
 }
 
 bool mainActivity::onTimer(int id) {
-	return onUI_Timer(id);
+    return onUI_Timer(id);
 }
 
 void mainActivity::onProgressChanged(ZKSeekBar *pSeekBar, int progress){
@@ -237,34 +308,50 @@ void mainActivity::onItemClick(ZKListView *pListView, int index, int id){
     }
 }
 
+
+
+
 void mainActivity::onSlideItemClick(ZKSlideWindow *pSlideWindow, int index) {
     int tablen = sizeof(SSlideWindowItemClickCallbackTab) / sizeof(S_SlideWindowItemClickCallback);
     for (int i = 0; i < tablen; ++i)
     {
         if (SSlideWindowItemClickCallbackTab[i].id == pSlideWindow->getID())
         {
-        	if (index < sizeof(IconTab)/sizeof(char*))
-        	{
+            if (index < sizeof(IconTab)/sizeof(char*))
+            {
                 SSlideWindowItemClickCallbackTab[i].onSlideItemClickCallback(pSlideWindow, index);
                 break;
-        	}
+            }
             else
             {
-            	//browser start
-            	exit(0);
+                //browser start
+                IPCOutput o(SVC_IPC);
+                if(!o.Init())
+                {
+                    printf("Brown process Not start!!!\n");
+                    o.Term();
+                }
+                IPCEvent sendevt;
+                memset(&sendevt,0,sizeof(IPCEvent));
+                sendevt.EventType = IPC_COMMAND;
+                sendevt.Data = IPC_COMMAND_APP_START;  //IPC_COMMAND_APP_STOP to stop browser fg
+
+                o.Send(sendevt);
+                SSTAR_DeinitHotPlugDetect();
+                exit(0);
             }
         }
     }
 }
 
 void mainActivity::onSlidePageChange(ZKSlideWindow *pSlideWindow, int page) {
-	int tablen = sizeof(SSlideWindowPageChangeCallbackTab) / sizeof(S_SlideWindowPageChangeCallback);
-	for (int i = 0; i < tablen; ++i) {
-		if (SSlideWindowPageChangeCallbackTab[i].id == pSlideWindow->getID()) {
-			SSlideWindowPageChangeCallbackTab[i].onSlidePageChangeCallback(pSlideWindow, page);
-			break;
-		}
-	}
+    int tablen = sizeof(SSlideWindowPageChangeCallbackTab) / sizeof(S_SlideWindowPageChangeCallback);
+    for (int i = 0; i < tablen; ++i) {
+        if (SSlideWindowPageChangeCallbackTab[i].id == pSlideWindow->getID()) {
+            SSlideWindowPageChangeCallbackTab[i].onSlidePageChangeCallback(pSlideWindow, page);
+            break;
+        }
+    }
 }
 
 bool mainActivity::onTouchEvent(const MotionEvent &ev) {
@@ -294,12 +381,12 @@ void mainActivity::onVideoPlayerMessage(ZKVideoView *pVideoView, int msg) {
     int tablen = sizeof(SVideoViewCallbackTab) / sizeof(S_VideoViewCallback);
     for (int i = 0; i < tablen; ++i) {
         if (SVideoViewCallbackTab[i].id == pVideoView->getID()) {
-        	if (SVideoViewCallbackTab[i].loop) {
+            if (SVideoViewCallbackTab[i].loop) {
                 //循环播放
-        		videoLoopPlayback(pVideoView, msg, i);
-        	} else if (SVideoViewCallbackTab[i].onVideoViewCallback != NULL){
-        	    SVideoViewCallbackTab[i].onVideoViewCallback(pVideoView, msg);
-        	}
+                videoLoopPlayback(pVideoView, msg, i);
+            } else if (SVideoViewCallbackTab[i].onVideoViewCallback != NULL){
+                SVideoViewCallbackTab[i].onVideoViewCallback(pVideoView, msg);
+            }
             break;
         }
     }
@@ -307,21 +394,21 @@ void mainActivity::onVideoPlayerMessage(ZKVideoView *pVideoView, int msg) {
 
 void mainActivity::videoLoopPlayback(ZKVideoView *pVideoView, int msg, int callbackTabIndex) {
 
-	switch (msg) {
-	case ZKVideoView::E_MSGTYPE_VIDEO_PLAY_STARTED:
-		LOGD("ZKVideoView::E_MSGTYPE_VIDEO_PLAY_STARTED\n");
-		pVideoView->setVolume(SVideoViewCallbackTab[callbackTabIndex].defaultvolume / 10.0);
-		mVideoLoopErrorCount = 0;
-		break;
-	case ZKVideoView::E_MSGTYPE_VIDEO_PLAY_ERROR:
-		/**错误处理 */
-		++mVideoLoopErrorCount;
-		if (mVideoLoopErrorCount > 100) {
-			LOGD("video loop error counts > 100, quit loop playback !");
+    switch (msg) {
+    case ZKVideoView::E_MSGTYPE_VIDEO_PLAY_STARTED:
+        LOGD("ZKVideoView::E_MSGTYPE_VIDEO_PLAY_STARTED\n");
+        pVideoView->setVolume(SVideoViewCallbackTab[callbackTabIndex].defaultvolume / 10.0);
+        mVideoLoopErrorCount = 0;
+        break;
+    case ZKVideoView::E_MSGTYPE_VIDEO_PLAY_ERROR:
+        /**错误处理 */
+        ++mVideoLoopErrorCount;
+        if (mVideoLoopErrorCount > 100) {
+            LOGD("video loop error counts > 100, quit loop playback !");
             break;
-		} //不用break, 继续尝试播放下一个
-	case ZKVideoView::E_MSGTYPE_VIDEO_PLAY_COMPLETED:
-		LOGD("ZKVideoView::E_MSGTYPE_VIDEO_PLAY_COMPLETED\n");
+        } //不用break, 继续尝试播放下一个
+    case ZKVideoView::E_MSGTYPE_VIDEO_PLAY_COMPLETED:
+        LOGD("ZKVideoView::E_MSGTYPE_VIDEO_PLAY_COMPLETED\n");
         std::vector<std::string> videolist;
         std::string fileName(getAppName());
         if (fileName.size() < 4) {
@@ -332,77 +419,77 @@ void mainActivity::videoLoopPlayback(ZKVideoView *pVideoView, int msg, int callb
         fileName = "/mnt/extsd/" + fileName;
         if (!parseVideoFileList(fileName.c_str(), videolist)) {
             LOGD("parseVideoFileList failed !");
-		    break;
+            break;
         }
-		if (pVideoView && !videolist.empty()) {
-			mVideoLoopIndex = (mVideoLoopIndex + 1) % videolist.size();
-			pVideoView->play(videolist[mVideoLoopIndex].c_str());
-		}
-		break;
-	}
+        if (pVideoView && !videolist.empty()) {
+            mVideoLoopIndex = (mVideoLoopIndex + 1) % videolist.size();
+            pVideoView->play(videolist[mVideoLoopIndex].c_str());
+        }
+        break;
+    }
 }
 
 void mainActivity::startVideoLoopPlayback() {
     int tablen = sizeof(SVideoViewCallbackTab) / sizeof(S_VideoViewCallback);
     for (int i = 0; i < tablen; ++i) {
-    	if (SVideoViewCallbackTab[i].loop) {
-    		ZKVideoView* videoView = (ZKVideoView*)findControlByID(SVideoViewCallbackTab[i].id);
-    		if (!videoView) {
-    			return;
-    		}
-    		//循环播放
-    		videoLoopPlayback(videoView, ZKVideoView::E_MSGTYPE_VIDEO_PLAY_COMPLETED, i);
-    		return;
-    	}
+        if (SVideoViewCallbackTab[i].loop) {
+            ZKVideoView* videoView = (ZKVideoView*)findControlByID(SVideoViewCallbackTab[i].id);
+            if (!videoView) {
+                return;
+            }
+            //循环播放
+            videoLoopPlayback(videoView, ZKVideoView::E_MSGTYPE_VIDEO_PLAY_COMPLETED, i);
+            return;
+        }
     }
 }
 
 void mainActivity::stopVideoLoopPlayback() {
     int tablen = sizeof(SVideoViewCallbackTab) / sizeof(S_VideoViewCallback);
     for (int i = 0; i < tablen; ++i) {
-    	if (SVideoViewCallbackTab[i].loop) {
-    		ZKVideoView* videoView = (ZKVideoView*)findControlByID(SVideoViewCallbackTab[i].id);
-    		if (!videoView) {
-    			return;
-    		}
-    		if (videoView->isPlaying()) {
-    		    videoView->stop();
-    		}
-    		return;
-    	}
+        if (SVideoViewCallbackTab[i].loop) {
+            ZKVideoView* videoView = (ZKVideoView*)findControlByID(SVideoViewCallbackTab[i].id);
+            if (!videoView) {
+                return;
+            }
+            if (videoView->isPlaying()) {
+                videoView->stop();
+            }
+            return;
+        }
     }
 }
 
 bool mainActivity::parseVideoFileList(const char *pFileListPath, std::vector<string>& mediaFileList) {
-	mediaFileList.clear();
-	if (NULL == pFileListPath || 0 == strlen(pFileListPath)) {
+    mediaFileList.clear();
+    if (NULL == pFileListPath || 0 == strlen(pFileListPath)) {
         LOGD("video file list is null!");
-		return false;
-	}
+        return false;
+    }
 
-	ifstream is(pFileListPath, ios_base::in);
-	if (!is.is_open()) {
-		LOGD("cann't open file %s \n", pFileListPath);
-		return false;
-	}
-	char tmp[1024] = {0};
-	while (is.getline(tmp, sizeof(tmp))) {
-		string str = tmp;
-		removeCharFromString(str, '\"');
-		removeCharFromString(str, '\r');
-		removeCharFromString(str, '\n');
-		if (str.size() > 1) {
-     		mediaFileList.push_back(str.c_str());
-		}
-	}
-	LOGD("(f:%s, l:%d) parse fileList[%s], get [%d]files\n", __FUNCTION__,
-			__LINE__, pFileListPath, mediaFileList.size());
-	for (size_t i = 0; i < mediaFileList.size(); i++) {
-		LOGD("file[%d]:[%s]\n", i, mediaFileList[i].c_str());
-	}
-	is.close();
+    ifstream is(pFileListPath, ios_base::in);
+    if (!is.is_open()) {
+        LOGD("cann't open file %s \n", pFileListPath);
+        return false;
+    }
+    char tmp[1024] = {0};
+    while (is.getline(tmp, sizeof(tmp))) {
+        string str = tmp;
+        removeCharFromString(str, '\"');
+        removeCharFromString(str, '\r');
+        removeCharFromString(str, '\n');
+        if (str.size() > 1) {
+            mediaFileList.push_back(str.c_str());
+        }
+    }
+    LOGD("(f:%s, l:%d) parse fileList[%s], get [%d]files\n", __FUNCTION__,
+            __LINE__, pFileListPath, mediaFileList.size());
+    for (size_t i = 0; i < mediaFileList.size(); i++) {
+        LOGD("file[%d]:[%s]\n", i, mediaFileList[i].c_str());
+    }
+    is.close();
 
-	return true;
+    return true;
 }
 
 int mainActivity::removeCharFromString(string& nString, char c) {
@@ -419,13 +506,13 @@ int mainActivity::removeCharFromString(string& nString, char c) {
 }
 
 void mainActivity::registerUserTimer(int id, int time) {
-	registerTimer(id, time);
+    registerTimer(id, time);
 }
 
 void mainActivity::unregisterUserTimer(int id) {
-	unregisterTimer(id);
+    unregisterTimer(id);
 }
 
 void mainActivity::resetUserTimer(int id, int time) {
-	resetTimer(id, time);
+    resetTimer(id, time);
 }
