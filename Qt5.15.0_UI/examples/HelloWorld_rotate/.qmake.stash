@@ -1,0 +1,23 @@
+QMAKE_CXX.QT_COMPILER_STDCXX = 201402L
+QMAKE_CXX.QMAKE_GCC_MAJOR_VERSION = 8
+QMAKE_CXX.QMAKE_GCC_MINOR_VERSION = 2
+QMAKE_CXX.QMAKE_GCC_PATCH_VERSION = 1
+QMAKE_CXX.COMPILER_MACROS = \
+    QT_COMPILER_STDCXX \
+    QMAKE_GCC_MAJOR_VERSION \
+    QMAKE_GCC_MINOR_VERSION \
+    QMAKE_GCC_PATCH_VERSION
+QMAKE_CXX.INCDIRS = \
+    /opt/ToolChain/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf/arm-linux-gnueabihf/include/c++/8.2.1 \
+    /opt/ToolChain/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf/arm-linux-gnueabihf/include/c++/8.2.1/arm-linux-gnueabihf \
+    /opt/ToolChain/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf/arm-linux-gnueabihf/include/c++/8.2.1/backward \
+    /opt/ToolChain/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf/lib/gcc/arm-linux-gnueabihf/8.2.1/include \
+    /opt/ToolChain/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf/lib/gcc/arm-linux-gnueabihf/8.2.1/include-fixed \
+    /opt/ToolChain/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf/arm-linux-gnueabihf/include \
+    /opt/ToolChain/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf/arm-linux-gnueabihf/libc/usr/include
+QMAKE_CXX.LIBDIRS = \
+    /opt/ToolChain/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf/lib/gcc/arm-linux-gnueabihf/8.2.1 \
+    /opt/ToolChain/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf/lib/gcc \
+    /opt/ToolChain/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf/arm-linux-gnueabihf/lib \
+    /opt/ToolChain/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf/arm-linux-gnueabihf/libc/lib \
+    /opt/ToolChain/gcc-arm-8.2-2018.08-x86_64-arm-linux-gnueabihf/arm-linux-gnueabihf/libc/usr/lib

@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "vdec2disp.h": "c",
+        "stb_image.h": "c"
+    }
+}

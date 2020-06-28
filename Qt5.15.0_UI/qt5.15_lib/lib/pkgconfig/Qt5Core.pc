@@ -1,0 +1,15 @@
+prefix=/home/koda.xu/Qt/Qt5.15.0/qt5.15_lib
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+host_bins=${prefix}/bin
+qt_config=release c++11 c++14 c++17 c++1z concurrent dbus no-pkg-config reduce_exports release_tools static stl properties animation textcodec big_codecs clock-monotonic codecs itemmodel proxymodel concatenatetablesproxymodel textdate datestring doubleconversion eventfd filesystemiterator filesystemwatcher gestures identityproxymodel inotify library mimetype process statemachine regularexpression settings sharedmemory sortfilterproxymodel stringlistmodel systemsemaphore temporaryfile threadsafe-cloexec translation transposeproxymodel xmlstream xmlstreamreader xmlstreamwriter
+
+Name: Qt5 Core
+Description: Qt Core module
+Version: 5.15.0
+Libs: -L${libdir} -lQt5Core 
+Libs.private: -L/home/koda.xu/Qt/tslib_1.21/arm_tslib/lib -lpthread -lm /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libqtpcre2.a -L/home/koda.xu/Qt/tslib_1.21/arm_tslib/lib -ldl   
+Cflags: -DQT_CORE_LIB -I${includedir}/QtCore -I${includedir}
+

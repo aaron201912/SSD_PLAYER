@@ -1,0 +1,14 @@
+prefix=/home/koda.xu/Qt/Qt5.15.0/qt5.15_lib
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+
+Name: Qt5 QuickTest
+Description: Qt QuickTest module
+Version: 5.15.0
+Libs: -L${libdir} -lQt5QuickTest 
+Libs.private: -L/home/koda.xu/Qt/tslib_1.21/arm_tslib/lib /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libQt5Test.a /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libQt5Widgets.a /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libQt5Gui.a /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libqtlibpng.a /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libqtharfbuzz.a /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libQt5Core.a -lm /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libqtpcre2.a -ldl -lpthread /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libQt5Quick.a -L/home/koda.xu/Qt/tslib_1.21/arm_tslib/lib /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libQt5Gui.a /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libqtlibpng.a /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libqtharfbuzz.a /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libQt5QmlModels.a /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libQt5Qml.a -lrt /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libQt5Network.a /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libQt5Core.a -lpthread -lm /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libqtpcre2.a -ldl   
+Cflags: -DQT_QMLTEST_LIB -I${includedir}/QtQuickTest -I${includedir}
+Requires: Qt5Core Qt5Test Qt5Widgets
+

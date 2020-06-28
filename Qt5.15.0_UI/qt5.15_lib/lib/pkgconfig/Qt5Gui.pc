@@ -1,0 +1,14 @@
+prefix=/home/koda.xu/Qt/Qt5.15.0/qt5.15_lib
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+
+Name: Qt5 Gui
+Description: Qt Gui module
+Version: 5.15.0
+Libs: -L${libdir} -lQt5Gui 
+Libs.private: -L/home/koda.xu/Qt/tslib_1.21/arm_tslib/lib /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libQt5Core.a -lm /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libqtpcre2.a -ldl -lpthread -L/home/koda.xu/Qt/tslib_1.21/arm_tslib/lib /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libqtlibpng.a /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libQt5Core.a -lpthread -lm /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libqtpcre2.a -ldl /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libqtharfbuzz.a   
+Cflags: -DQT_GUI_LIB -I${includedir}/QtGui -I${includedir}
+Requires: Qt5Core
+

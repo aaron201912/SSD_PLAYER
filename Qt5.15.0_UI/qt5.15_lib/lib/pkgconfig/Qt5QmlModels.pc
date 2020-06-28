@@ -1,0 +1,14 @@
+prefix=/home/koda.xu/Qt/Qt5.15.0/qt5.15_lib
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+
+Name: Qt5 QmlModels
+Description: Qt QmlModels module
+Version: 5.15.0
+Libs: -L${libdir} -lQt5QmlModels 
+Libs.private: -L/home/koda.xu/Qt/tslib_1.21/arm_tslib/lib /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libQt5Qml.a -lrt /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libQt5Network.a /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libQt5Core.a -lm /home/koda.xu/Qt/Qt5.15.0/qt5.15_lib/lib/libqtpcre2.a -ldl -lpthread    
+Cflags: -DQT_QMLMODELS_LIB -I${includedir}/QtQmlModels -I${includedir}
+Requires: Qt5Core Qt5Qml
+

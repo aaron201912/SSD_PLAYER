@@ -1,0 +1,12 @@
+prefix=/home/koda.xu/Qt/Qt5.15.0/qt5.15_lib
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+
+Name: Qt5 RepParser
+Description: Qt RepParser module
+Version: 5.15.0
+Cflags: -DQT_REPPARSER_LIB -I${includedir}/QtRepParser -I${includedir}
+Requires: Qt5Core
+
