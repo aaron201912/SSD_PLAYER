@@ -10,7 +10,8 @@ extern "C" {               // 告诉编译器下列代码要以C链接约定的�
 #include <stdint.h>
 #include <stdbool.h>
 #include <pthread.h>
-
+#include <sys/time.h>
+#include <sys/prctl.h>
 
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
@@ -19,13 +20,19 @@ extern "C" {               // 告诉编译器下列代码要以C链接约定的�
 #include <libavutil/frame.h>
 #include <libavutil/time.h>
 #include <libavutil/imgutils.h>
+#include <libavutil/samplefmt.h>
 #include <libavutil/avassert.h>
 #include <libavutil/log.h>
 
+
 #include "mi_common.h"
-#include "mi_common_datatype.h"
 #include "mi_sys.h"
-#include "mi_sys_datatype.h"
+#include "mi_disp.h"
+#include "mi_divp.h"
+#include "mi_vdec.h"
+#include "mi_gfx.h"
+#include "mi_ao.h"
+#include "mi_vdec_extra.h"
 
 #define     SUCCESS         0
 #define     FAIL            1
@@ -56,7 +63,8 @@ extern "C" {               // 告诉编译器下列代码要以C链接约定的�
 #define SDL_AUDIO_BUFFER_SIZE 1024
 #define MAX_AUDIO_FRAME_SIZE 192000
 
-#define MAX_QUEUE_SIZE (15 * 1024 * 1024)
+#define MIN_QUEUE_SIZE      (50 * 1024)
+#define MAX_QUEUE_SIZE      (3 * 1024 * 1024)
 #define MIN_FRAMES 25
 
 /* Minimum SDL audio buffer size, in samples. */
@@ -64,7 +72,7 @@ extern "C" {               // 告诉编译器下列代码要以C链接约定的�
 /* Calculate actual buffer size keeping in mind not cause too frequent audio callbacks */
 #define SDL_AUDIO_MAX_CALLBACKS_PER_SEC 30
 
-#define VIDEO_PICTURE_QUEUE_SIZE 2
+#define VIDEO_PICTURE_QUEUE_SIZE 3
 #define SUBPICTURE_QUEUE_SIZE 16
 #define SAMPLE_QUEUE_SIZE 9
 #define FRAME_QUEUE_SIZE FFMAX(SAMPLE_QUEUE_SIZE, FFMAX(VIDEO_PICTURE_QUEUE_SIZE, SUBPICTURE_QUEUE_SIZE))
@@ -123,6 +131,9 @@ typedef struct {
     AVRational sar;
     int uploaded;
     int flip_v;
+    uint8_t *vir_addr;
+    unsigned long long phy_addr;
+    int buf_size;
 }   frame_t;
 
 typedef struct {
@@ -146,16 +157,20 @@ typedef struct {
     MI_S32 (*fpGetCurrentPlayPosFromAudio)(long long currentPos, long long frame_duration);
     MI_S32 (*fpDisplayVideo)(void *pData, bool bState);
     MI_S32 (*fpVideoPutBufBack)(void *pData);
-    MI_S32 (*fpPlayAudio)(MI_U8 *pu8AudioData, MI_U32 u32DataLen);
+    MI_S32 (*fpPlayAudio)(MI_U8 *pu8AudioData, MI_U32 u32DataLen, MI_S32 *s32BusyNum);
     MI_S32 (*fpPauseAudio)();
     MI_S32 (*fpResumeAudio)();
     MI_S32 (*fpPlayComplete)();
     MI_S32 (*fpPlayError)(int error);
+    MI_S32 (*fpSetVideoDisplay)(void);
+    MI_S32 (*fpResetVideoDisplay)(void);
 }   player_control_t;
 
 typedef struct {
     char *filename;
+    AVDictionary *p_dict;
     AVFormatContext *p_fmt_ctx;
+    AVInputFormat *p_iformat;
     AVStream *p_audio_stream;
     AVStream *p_video_stream;
     AVCodecContext *p_acodec_ctx;
@@ -200,18 +215,26 @@ typedef struct {
     int last_paused;
     int read_pause_return;
     int step;
-    int eof;
+    int eof, no_pkt_buf;
     int audio_complete, video_complete;
     int seek_req;
-    int seek_flags;
+    int seek_flags, seek_by_bytes;
     int av_sync_type;
     int64_t seek_pos;
     int64_t seek_rel;
 
-    int out_width;
-    int out_height;
+    unsigned long long phy_addr;
+    uint8_t *vir_addr;
+    int buf_size;
+    int display_mode;
+    int src_width, src_height;  // 保存视频原宽高
+    int dst_width, dst_height;  // 保存视频旋转后的宽高
+    int out_width, out_height;  // 保存视频最终显示的宽高
+    int in_width, in_height;    // 保存外部输入的显示宽高
+    int pos_x, pos_y;
     long long duration;
     long long curPos;
+    bool flush, start_play, enable_audio, enable_video;
 
     pthread_cond_t continue_read_thread;
     pthread_t read_tid;         //demux解复用线程
@@ -227,7 +250,12 @@ typedef struct {
     bool demux_status;
 
     player_control_t playerController;
+
+    pthread_mutex_t audio_mutex, video_mutex;
+    pthread_cond_t audio_cond, video_cond;
 }   player_stat_t;
+
+extern player_stat_t *g_myplayer;
 
 player_stat_t *player_init(const char *p_input_file);
 int player_deinit(player_stat_t *is);

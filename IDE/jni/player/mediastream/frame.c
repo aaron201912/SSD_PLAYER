@@ -2,9 +2,34 @@
 #include "frame.h"
 #include "player.h"
 
+void frame_queue_putbuf(AVFrame *frame)
+{
+    if (frame->width > 0 && frame->opaque) {
+        SS_Vdec_BufInfo *stVdecBuf = (SS_Vdec_BufInfo *)frame->opaque;
+        if (MI_SUCCESS != MI_SYS_ChnOutputPortPutBuf(stVdecBuf->stVdecHandle)) {
+            printf("frame_queue_putbuf failed!\n");
+        }
+        av_freep(&frame->opaque);
+    }
+}
+
+void frame_queue_free_mmu(frame_t *vp)
+{
+    if (vp->vir_addr && vp->phy_addr) {
+        //MI_SYS_FlushInvCache(vp->vir_addr, vp->buf_size);
+        MI_SYS_Munmap(vp->vir_addr, vp->buf_size);
+        MI_SYS_MMA_Free(vp->phy_addr);
+        vp->vir_addr = NULL;
+        vp->phy_addr = 0;
+    }
+}
 
 void frame_queue_unref_item(frame_t *vp)
 {
+    frame_queue_free_mmu(vp);
+
+    frame_queue_putbuf(vp->frame);
+
     av_frame_unref(vp->frame);
 }
 

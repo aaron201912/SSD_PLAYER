@@ -40,13 +40,14 @@
 #include "mi_disp.h"
 #include "mi_vdec_extra.h"
 //#include "mi_panel.h"
-//#include "mi_gfx.h"
+#include "mi_gfx.h"
 #include "utils/BitmapHelper.h"
 #include "frame.h"
 #include "demux.h"
 #include "videostream.h"
 #include "audiostream.h"
 #include "player.h"
+#include "blitutil.h"
 #include "panelconfig.h"
 #include "hotplugdetect.h"
 
@@ -266,7 +267,7 @@ int GetPlayerVolumn()
 
 MI_S32 CreatePlayerDev()
 {
-    MI_SYS_ChnPort_t stDivpChnPort;
+    /*MI_SYS_ChnPort_t stDivpChnPort;
     MI_DIVP_ChnAttr_t stDivpChnAttr;
     MI_DIVP_OutputPortAttr_t stOutputPortAttr;
 
@@ -274,8 +275,9 @@ MI_S32 CreatePlayerDev()
     MI_DISP_DEV dispDev = DISP_DEV;
     MI_DISP_LAYER dispLayer = DISP_LAYER;
     MI_SYS_ChnPort_t stDispChnPort;
+    MI_DISP_RotateConfig_t stRotateConfig;*/
+
     MI_DISP_InputPortAttr_t stInputPortAttr;
-    MI_DISP_RotateConfig_t stRotateConfig;
 
     system("echo 12 > /sys/class/gpio/export");
     system("echo out > /sys/class/gpio/gpio12/direction");
@@ -294,7 +296,7 @@ MI_S32 CreatePlayerDev()
     printf("disp input: w=%d, h=%d\n", stInputPortAttr.u16SrcWidth, stInputPortAttr.u16SrcHeight);
 
     // 2.初始化DIVP模块
-    memset(&stDivpChnAttr, 0, sizeof(MI_DIVP_ChnAttr_t));
+    /*memset(&stDivpChnAttr, 0, sizeof(MI_DIVP_ChnAttr_t));
     stDivpChnAttr.bHorMirror            = FALSE;
     stDivpChnAttr.bVerMirror            = FALSE;
     stDivpChnAttr.eDiType               = E_MI_DIVP_DI_TYPE_OFF;
@@ -333,17 +335,17 @@ MI_S32 CreatePlayerDev()
         stInputPortAttr.u16SrcHeight    = ALIGN_DOWN(g_playViewWidth , 32);
         stOutputPortAttr.u32Width       = ALIGN_DOWN(g_playViewHeight, 32);
         stOutputPortAttr.u32Height      = ALIGN_DOWN(g_playViewWidth , 32);
-    }
+    }*/
 
     MI_DISP_DisableInputPort(DISP_LAYER, DISP_INPUTPORT);
     MI_DISP_SetInputPortAttr(DISP_LAYER, DISP_INPUTPORT, &stInputPortAttr);
     MI_DISP_EnableInputPort(DISP_LAYER, DISP_INPUTPORT);
     MI_DISP_SetInputPortSyncMode(DISP_LAYER, DISP_INPUTPORT, E_MI_DISP_SYNC_MODE_FREE_RUN);
 
-    MI_DIVP_SetOutputPortAttr(0, &stOutputPortAttr);
+    //MI_DIVP_SetOutputPortAttr(0, &stOutputPortAttr);
 
     //4.绑定DIVP与DISP
-    memset(&stDispChnPort, 0, sizeof(MI_SYS_ChnPort_t));
+    /*memset(&stDispChnPort, 0, sizeof(MI_SYS_ChnPort_t));
     stDispChnPort.eModId                = E_MI_MODULE_ID_DISP;
     stDispChnPort.u32DevId              = DISP_DEV;
     stDispChnPort.u32ChnId              = 0;
@@ -356,14 +358,14 @@ MI_S32 CreatePlayerDev()
     stDivpChnPort.u32PortId             = 0;
 
     MI_SYS_SetChnOutputPortDepth(&stDivpChnPort, 0, 3);
-    MI_SYS_BindChnPort(&stDivpChnPort, &stDispChnPort, 30, 30);
+    MI_SYS_BindChnPort(&stDivpChnPort, &stDispChnPort, 30, 30);*/
 
     return 0;
 }
 
 void DestroyPlayerDev()
 {
-    MI_DISP_LAYER dispLayer = DISP_LAYER;
+    /*MI_DISP_LAYER dispLayer = DISP_LAYER;
     MI_U32 u32InputPort = DISP_INPUTPORT;
     MI_SYS_ChnPort_t stDivpChnPort;
     MI_SYS_ChnPort_t stDispChnPort;
@@ -383,11 +385,145 @@ void DestroyPlayerDev()
     MI_SYS_UnBindChnPort(&stDivpChnPort, &stDispChnPort);
 
     MI_DIVP_StopChn(0);
-    MI_DIVP_DestroyChn(0);
+    MI_DIVP_DestroyChn(0);*/
 
     MI_DISP_DisableInputPort(DISP_LAYER, DISP_INPUTPORT);
 }
 
+static MI_S32 SetVideoDisplay(void)
+{
+    MI_DISP_RotateConfig_t stRotateConfig;
+
+    if (g_pstPlayStat->decode_type == SOFT_DECODING)
+    {
+        MI_SYS_ChnPort_t stDivpChnPort;
+        MI_DIVP_ChnAttr_t stDivpChnAttr;
+        MI_DIVP_OutputPortAttr_t stOutputPortAttr;
+        MI_DISP_InputPortAttr_t stInputPortAttr;
+        MI_SYS_ChnPort_t stDispChnPort;
+        MI_SYS_ChnPort_t stDiVpChnPort;
+
+        MI_GFX_Open();
+
+        memset(&stInputPortAttr, 0, sizeof(MI_DISP_InputPortAttr_t));
+        MI_DISP_GetInputPortAttr(0, 0, &stInputPortAttr);
+        stInputPortAttr.u16SrcWidth         = ALIGN_DOWN(g_pstPlayStat->src_width , 32);
+        stInputPortAttr.u16SrcHeight        = ALIGN_DOWN(g_pstPlayStat->src_height, 32);
+        stInputPortAttr.stDispWin.u16X      = g_pstPlayStat->pos_x;
+        stInputPortAttr.stDispWin.u16Y      = g_pstPlayStat->pos_y;
+        stInputPortAttr.stDispWin.u16Width  = g_pstPlayStat->out_width;
+        stInputPortAttr.stDispWin.u16Height = g_pstPlayStat->out_height;
+
+        memset(&stDivpChnAttr, 0, sizeof(MI_DIVP_ChnAttr_t));
+        stDivpChnAttr.bHorMirror            = FALSE;
+        stDivpChnAttr.bVerMirror            = FALSE;
+        stDivpChnAttr.eDiType               = E_MI_DIVP_DI_TYPE_OFF;
+        stDivpChnAttr.eRotateType           = E_MI_SYS_ROTATE_NONE;
+        stDivpChnAttr.eTnrLevel             = E_MI_DIVP_TNR_LEVEL_OFF;
+        stDivpChnAttr.stCropRect.u16X       = 0;
+        stDivpChnAttr.stCropRect.u16Y       = 0;
+        stDivpChnAttr.stCropRect.u16Width   = 0;
+        stDivpChnAttr.stCropRect.u16Height  = 0;
+        stDivpChnAttr.u32MaxWidth           = 1920;
+        stDivpChnAttr.u32MaxHeight          = 1080;
+
+        MI_DIVP_CreateChn(DIVP_CHN, &stDivpChnAttr);
+        MI_DIVP_StartChn(DIVP_CHN);
+
+        memset(&stOutputPortAttr, 0, sizeof(MI_DIVP_OutputPortAttr_t));
+        stOutputPortAttr.eCompMode          = E_MI_SYS_COMPRESS_MODE_NONE;
+        stOutputPortAttr.ePixelFormat       = E_MI_SYS_PIXEL_FRAME_YUV_SEMIPLANAR_420;
+        stOutputPortAttr.u32Width           = ALIGN_DOWN(g_pstPlayStat->src_width , 32);
+        stOutputPortAttr.u32Height          = ALIGN_DOWN(g_pstPlayStat->src_height, 32);
+        MI_DIVP_SetOutputPortAttr(0, &stOutputPortAttr);
+
+        MI_DISP_DisableInputPort(DISP_LAYER, DISP_INPUTPORT);
+        MI_DISP_SetInputPortAttr(DISP_LAYER, DISP_INPUTPORT, &stInputPortAttr);
+        MI_DISP_EnableInputPort(DISP_LAYER, DISP_INPUTPORT);
+        MI_DISP_SetInputPortSyncMode(DISP_LAYER, DISP_INPUTPORT, E_MI_DISP_SYNC_MODE_FREE_RUN);
+
+        memset(&stDispChnPort, 0, sizeof(MI_SYS_ChnPort_t));
+        stDispChnPort.eModId                = E_MI_MODULE_ID_DISP;
+        stDispChnPort.u32DevId              = DISP_DEV;
+        stDispChnPort.u32ChnId              = 0;
+        stDispChnPort.u32PortId             = DISP_INPUTPORT;
+
+        memset(&stDivpChnPort, 0, sizeof(MI_SYS_ChnPort_t));
+        stDivpChnPort.eModId                = E_MI_MODULE_ID_DIVP;
+        stDivpChnPort.u32DevId              = 0;
+        stDivpChnPort.u32ChnId              = DIVP_CHN;
+        stDivpChnPort.u32PortId             = 0;
+
+        MI_SYS_SetChnOutputPortDepth(&stDivpChnPort, 0, 3);
+        MI_SYS_BindChnPort(&stDivpChnPort, &stDispChnPort, 30, 30);
+
+        // 软解采用GFX旋转, 无须设置DISP
+        stRotateConfig.eRotateMode = E_MI_DISP_ROTATE_NONE;
+    }
+    else
+    {
+        MI_DISP_InputPortAttr_t stInputPortAttr;
+
+        memset(&stInputPortAttr, 0, sizeof(MI_DISP_InputPortAttr_t));
+        MI_DISP_GetInputPortAttr(0, 0, &stInputPortAttr);
+        stInputPortAttr.u16SrcWidth         = ALIGN_DOWN(g_pstPlayStat->src_width , 32);
+        stInputPortAttr.u16SrcHeight        = ALIGN_DOWN(g_pstPlayStat->src_height, 32);
+        stInputPortAttr.stDispWin.u16X      = g_pstPlayStat->pos_x;
+        stInputPortAttr.stDispWin.u16Y      = g_pstPlayStat->pos_y;
+        if (g_pstPlayStat->display_mode != E_MI_DISP_ROTATE_NONE) {
+            stInputPortAttr.stDispWin.u16Width  = g_pstPlayStat->out_height;
+            stInputPortAttr.stDispWin.u16Height = g_pstPlayStat->out_width;
+        } else {
+            stInputPortAttr.stDispWin.u16Width  = g_pstPlayStat->out_width;
+            stInputPortAttr.stDispWin.u16Height = g_pstPlayStat->out_height;
+        }
+
+        MI_DISP_DisableInputPort(DISP_LAYER, DISP_INPUTPORT);
+        MI_DISP_SetInputPortAttr(DISP_LAYER, DISP_INPUTPORT, &stInputPortAttr);
+        MI_DISP_EnableInputPort(DISP_LAYER, DISP_INPUTPORT);
+        MI_DISP_SetInputPortSyncMode(DISP_LAYER, DISP_INPUTPORT, E_MI_DISP_SYNC_MODE_FREE_RUN);
+        MI_DISP_ShowInputPort(DISP_LAYER, DISP_INPUTPORT);
+        // 硬解时使用DISP旋转
+        stRotateConfig.eRotateMode = g_pstPlayStat->display_mode;
+    }
+
+    MI_DISP_SetVideoLayerRotateMode(DISP_LAYER, &stRotateConfig);
+
+    return MI_SUCCESS;
+}
+
+static MI_S32 ResetVideoDisplay(void)
+{
+    if (g_pstPlayStat->decode_type == SOFT_DECODING)
+    {
+        MI_DISP_LAYER dispLayer = DISP_LAYER;
+        MI_U32 u32InputPort = DISP_INPUTPORT;
+        MI_SYS_ChnPort_t stDivpChnPort;
+        MI_SYS_ChnPort_t stDispChnPort;
+
+        memset(&stDispChnPort, 0, sizeof(MI_SYS_ChnPort_t));
+        stDispChnPort.eModId                = E_MI_MODULE_ID_DISP;
+        stDispChnPort.u32DevId              = DISP_DEV;
+        stDispChnPort.u32ChnId              = 0;
+        stDispChnPort.u32PortId             = DISP_INPUTPORT;
+
+        memset(&stDivpChnPort, 0, sizeof(MI_SYS_ChnPort_t));
+        stDivpChnPort.eModId                = E_MI_MODULE_ID_DIVP;
+        stDivpChnPort.u32DevId              = 0;
+        stDivpChnPort.u32ChnId              = DIVP_CHN;
+        stDivpChnPort.u32PortId             = 0;
+
+        MI_SYS_UnBindChnPort(&stDivpChnPort, &stDispChnPort);
+
+        MI_DIVP_StopChn(0);
+        MI_DIVP_DestroyChn(0);
+        MI_GFX_Close();
+    }
+
+    MI_DISP_DisableInputPort(DISP_LAYER, DISP_INPUTPORT);
+
+    return MI_SUCCESS;
+}
 
 MI_S32 StartPlayVideo()
 {
@@ -566,11 +702,157 @@ MI_S32 VideoPutBufBack(void *pData)
         return s32Ret;
     }
 
-    return -1;
+    return !MI_SUCCESS;
 }
 
+MI_S32 SetVideoRotate(MI_PHY yAddr, MI_PHY uvAddr)
+{
+    Surface_t srcY, dstY;
+    Surface_t srcUV, dstUV;
+    RECT_t r;
+    srcY.eGFXcolorFmt   = E_MI_GFX_FMT_I8;
+    srcY.h              = g_pstPlayStat->p_vcodec_ctx->height;
+    srcY.phy_addr       = g_pstPlayStat->phy_addr;
+    srcY.pitch          = g_pstPlayStat->p_vcodec_ctx->width;
+    srcY.w              = g_pstPlayStat->p_vcodec_ctx->width;
+    srcY.BytesPerPixel  = 1;
+
+    dstY.eGFXcolorFmt   = E_MI_GFX_FMT_I8;
+    dstY.h              = srcY.w;
+    dstY.phy_addr       = yAddr;
+    dstY.pitch          = ALIGN_UP(srcY.h, 16);
+    dstY.w              = srcY.h;
+    dstY.BytesPerPixel  = 1;
+    r.left   = 0;
+    r.top    = 0;
+    r.bottom = srcY.h;
+    r.right  = srcY.w;
+
+    if (g_pstPlayStat->display_mode == E_MI_DISP_ROTATE_270) {
+        SstarBlitCCW(&srcY, &dstY, &r);
+    }
+    else if (g_pstPlayStat->display_mode == E_MI_DISP_ROTATE_90) {
+        SstarBlitCW(&srcY, &dstY, &r);
+    }
+
+    srcUV.eGFXcolorFmt  = E_MI_GFX_FMT_ARGB4444;
+    srcUV.h             = g_pstPlayStat->p_vcodec_ctx->height / 2;
+    srcUV.phy_addr      = g_pstPlayStat->phy_addr + g_pstPlayStat->p_vcodec_ctx->width * g_pstPlayStat->p_vcodec_ctx->height;
+    srcUV.pitch         = g_pstPlayStat->p_vcodec_ctx->width;
+    srcUV.w             = g_pstPlayStat->p_vcodec_ctx->width / 2;
+    srcUV.BytesPerPixel = 2;
+
+    dstUV.eGFXcolorFmt  = E_MI_GFX_FMT_ARGB4444;
+    dstUV.h             = srcUV.w;
+    dstUV.phy_addr      = uvAddr;
+    dstUV.pitch         = ALIGN_UP(srcY.h, 16);
+    dstUV.w             = srcUV.h;
+    dstUV.BytesPerPixel = 2;
+    r.left   = 0;
+    r.top    = 0;
+    r.bottom = srcUV.h;
+    r.right  = srcUV.w;
+
+    if (g_pstPlayStat->display_mode == E_MI_DISP_ROTATE_270) {
+        SstarBlitCCW(&srcUV, &dstUV, &r);
+    } else if (g_pstPlayStat->display_mode == E_MI_DISP_ROTATE_90) {
+        SstarBlitCW(&srcUV, &dstUV, &r);
+    }
+
+    return MI_SUCCESS;
+}
 
 // MI display video
+#if 1
+MI_S32 DisplayVideo(void *pData, bool bState)
+{
+    MI_SYS_BUF_HANDLE hHandle;
+    MI_SYS_ChnPort_t stInputChnPort;
+    MI_SYS_BufConf_t stBufConf;
+    MI_SYS_BufInfo_t stBufInfo;
+
+    AVFrame *pFrame = (AVFrame *)pData;
+
+    if (g_pstPlayStat->decode_type == SOFT_DECODING)
+    {
+        memset(&stInputChnPort, 0, sizeof(MI_SYS_ChnPort_t));
+        stInputChnPort.eModId    = E_MI_MODULE_ID_DIVP;
+        stInputChnPort.u32ChnId  = 0;
+        stInputChnPort.u32DevId  = 0;
+        stInputChnPort.u32PortId = 0;
+
+        memset(&stBufInfo , 0 , sizeof(MI_SYS_BufInfo_t));
+        memset(&stBufConf , 0 , sizeof(MI_SYS_BufConf_t));
+
+        stBufConf.eBufType       = E_MI_SYS_BUFDATA_FRAME;
+        stBufConf.u64TargetPts   = 0;
+        stBufConf.u32Flags       = MI_SYS_MAP_VA;
+        stBufConf.stFrameCfg.eFormat        = E_MI_SYS_PIXEL_FRAME_YUV_SEMIPLANAR_420;
+        stBufConf.stFrameCfg.eFrameScanMode = E_MI_SYS_FRAME_SCAN_MODE_PROGRESSIVE;
+        stBufConf.stFrameCfg.stFrameBufExtraConf.u16BufHAlignment = 16;
+
+        if (g_pstPlayStat->display_mode == E_MI_DISP_ROTATE_NONE)
+        {
+            stBufConf.stFrameCfg.u16Width  = pFrame->width;
+            stBufConf.stFrameCfg.u16Height = pFrame->height;
+        } else
+        {
+            stBufConf.stFrameCfg.u16Width  = pFrame->height;
+            stBufConf.stFrameCfg.u16Height = pFrame->width;
+        }
+
+        MI_SYS_SetChnMMAConf(E_MI_MODULE_ID_DIVP, 0, 0, (MI_U8 *)"MMU_MMA");
+        if(MI_SUCCESS == MI_SYS_ChnInputPortGetBuf(&stInputChnPort, &stBufConf, &stBufInfo, &hHandle, -1))
+        {
+            stBufInfo.stFrameData.eCompressMode = E_MI_SYS_COMPRESS_MODE_NONE;
+            stBufInfo.stFrameData.eFieldType    = E_MI_SYS_FIELDTYPE_NONE;
+            stBufInfo.stFrameData.eTileMode     = E_MI_SYS_FRAME_TILE_MODE_NONE;
+            stBufInfo.bEndOfStream              = FALSE;
+
+            if (g_pstPlayStat->display_mode == E_MI_DISP_ROTATE_NONE)
+            {
+                for (int index = 0; index < stBufInfo.stFrameData.u16Height; index ++)
+                {
+                    memcpy(stBufInfo.stFrameData.pVirAddr[0] + index * stBufInfo.stFrameData.u32Stride[0],
+                           pFrame->data[0] + index * stBufInfo.stFrameData.u16Width,
+                           stBufInfo.stFrameData.u16Width);
+                }
+
+                for (int index = 0; index < stBufInfo.stFrameData.u16Height / 2; index ++)
+                {
+                    memcpy(stBufInfo.stFrameData.pVirAddr[1] + index * stBufInfo.stFrameData.u32Stride[1],
+                           pFrame->data[1] + index * stBufInfo.stFrameData.u16Width,
+                           stBufInfo.stFrameData.u16Width);
+                }
+            }
+            else
+            {
+                SetVideoRotate(stBufInfo.stFrameData.phyAddr[0], stBufInfo.stFrameData.phyAddr[1]);
+            }
+
+            MI_SYS_ChnInputPortPutBuf(hHandle ,&stBufInfo , FALSE);
+        }
+        VideoPutBufBack(pData);
+    }
+    else
+    {
+        MI_SYS_ChnPort_t  stInputChnPort;
+        memset(&stInputChnPort, 0, sizeof(MI_SYS_ChnPort_t));
+        stInputChnPort.eModId                    = E_MI_MODULE_ID_DISP;
+        stInputChnPort.u32ChnId                  = 0;
+        stInputChnPort.u32DevId                  = 0;
+        stInputChnPort.u32PortId                 = 0;
+
+        SS_Vdec_BufInfo *stVdecBuf = (SS_Vdec_BufInfo *)pFrame->opaque;
+
+        if (MI_SUCCESS != MI_SYS_ChnPortInjectBuf(stVdecBuf->stVdecHandle, &stInputChnPort)) {
+            printf("MI_SYS_ChnPortInjectBuf failed!\n");
+        }
+    }
+
+    return MI_SUCCESS;
+}
+#else
 MI_S32 DisplayVideo(void *pData, bool bState)
 {
     MI_SYS_BUF_HANDLE hHandle;
@@ -668,15 +950,20 @@ MI_S32 DisplayVideo(void *pData, bool bState)
 
     return 0;
 }
+#endif
 
 // MI play audio
-MI_S32 PlayAudio(MI_U8 *pu8AudioData, MI_U32 u32DataLen)
+MI_S32 PlayAudio(MI_U8 *pu8AudioData, MI_U32 u32DataLen, MI_S32 *s32BusyNum)
 {
     MI_S32 data_idx = 0, data_len = u32DataLen;
     MI_AUDIO_Frame_t stAoSendFrame;
     MI_S32 s32RetSendStatus = 0;
     MI_AUDIO_DEV AoDevId = AUDIO_DEV;
     MI_AO_CHN AoChn = AUDIO_CHN;
+    MI_AO_ChnState_t stState;
+
+    MI_AO_QueryChnStat(AUDIO_DEV, AoChn, &stState);
+    *s32BusyNum = stState.u32ChnBusyNum + 1024;
 
     //read data and send to AO module
     do {
@@ -820,6 +1107,8 @@ static void SetStreamPlayerControlCallBack(player_stat_t *is)
 	is->playerController.fpResumeAudio = ResumeAudio;
 	is->playerController.fpPlayComplete = PlayStreamFileComplete;
 	is->playerController.fpPlayError = PlayStreamFileError;
+	is->playerController.fpSetVideoDisplay = SetVideoDisplay;
+	is->playerController.fpResetVideoDisplay = ResetVideoDisplay;
 }
 
 static void AdjustVolumeByTouch(int startPos, int endPos)
@@ -886,9 +1175,9 @@ static void StartPlayStreamFile(char *pFileName)
 		printf("Initilize player failed!\n");
 		return;
 	}
-	g_pstPlayStat->out_width  = g_playViewWidth;
-	g_pstPlayStat->out_height = g_playViewHeight;
-	printf("video file name is : %s\n", g_pstPlayStat->filename);
+	g_pstPlayStat->in_width  = g_playViewWidth;
+	g_pstPlayStat->in_height = g_playViewHeight;
+	printf("video file name is : %s, panel w/h = [%d %d]\n", g_pstPlayStat->filename, g_playViewWidth, g_playViewHeight);
 
 	SetStreamPlayerControlCallBack(g_pstPlayStat);
 	printf("open_demux\n");
@@ -907,9 +1196,9 @@ static void StopPlayStreamFile()
 	// ffmpeg_player反初始化 & ui反初始化
 	g_bPlaying = false;
 	g_bPause = false;
+	StopPlayVideo();
 	player_deinit(g_pstPlayStat);
 	StopPlayAudio();
-	StopPlayVideo();
 	ResetSpeedMode();
 
 	SetPlayingStatus(false);
@@ -1383,8 +1672,8 @@ static void onStartTrackingTouch_Seekbar_progress(ZKSeekBar *pSeekBar) {
 	printf("onStartTrackingTouch_Seekbar_progress\n");
 	if (g_playStream)
 	{
-		if (!g_bPause)
-			toggle_pause(g_pstPlayStat);
+		//if (!g_bPause)
+		//    toggle_pause(g_pstPlayStat);
 	}
 	else
 	{
@@ -1407,9 +1696,9 @@ static void onStopTrackingTouch_Seekbar_progress(ZKSeekBar *pSeekBar) {
 	if (g_playStream)
 	{
 		//stream_seek(g_pstPlayStat, curPos, (curPos - g_lastpos), 0);
-		stream_seek(g_pstPlayStat, curPos, 0, 0);		// fot test
-		if (!g_bPause)
-			toggle_pause(g_pstPlayStat);
+		stream_seek(g_pstPlayStat, curPos, 0, g_pstPlayStat->seek_by_bytes);		// fot test
+		//if (!g_bPause)
+		//    toggle_pause(g_pstPlayStat);
 	}
 	else
 	{

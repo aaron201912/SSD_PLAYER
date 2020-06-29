@@ -49,9 +49,14 @@ static int audio_decode_frame(AVCodecContext *p_codec_ctx, packet_queue_t *p_pkt
 
         while (1)
         {
-            if (p_pkt_queue->abort_request)
-                return -1;
-
+            //if (p_pkt_queue->abort_request)
+            //    return -1;
+            pthread_mutex_lock(&g_myplayer->audio_mutex);
+            if (g_myplayer->seek_flags & (1 << 5)) {
+                pthread_mutex_unlock(&g_myplayer->audio_mutex);
+                break;
+            }
+            pthread_mutex_unlock(&g_myplayer->audio_mutex);
             // 3.2 一个音频packet含一至多个音频frame，每次avcodec_receive_frame()返回一个frame，此函数返回。
             // 下次进来此函数，继续获取一个frame，直到avcodec_receive_frame()返回AVERROR(EAGAIN)，
             // 表示解码器需要填入新的音频packet
@@ -100,8 +105,17 @@ static int audio_decode_frame(AVCodecContext *p_codec_ctx, packet_queue_t *p_pkt
         // packet_queue中第一个总是flush_pkt。每次seek操作会插入flush_pkt，更新serial，开启新的播放序列
         if (pkt.data == a_flush_pkt.data)
         {
+            pthread_mutex_lock(&g_myplayer->audio_mutex);
+            if ((g_myplayer->seek_flags & (1 << 5)) && p_codec_ctx->frame_number > 1) {
+                g_myplayer->seek_flags &= ~(1 << 5);
+                frame_queue_flush(&g_myplayer->audio_frm_queue);
+                MI_AO_ClearChnBuf(0, 0);
+            }
+            pthread_mutex_unlock(&g_myplayer->audio_mutex);
+
             // 复位解码器内部状态/刷新内部缓冲区。当seek操作或切换流时应调用此函数。
             avcodec_flush_buffers(p_codec_ctx);
+
             printf("avcodec_flush_buffers for audio!\n");
         }
         else
@@ -113,8 +127,8 @@ static int audio_decode_frame(AVCodecContext *p_codec_ctx, packet_queue_t *p_pkt
             {
                 av_log(NULL, AV_LOG_ERROR, "receive_frame and send_packet both returned EAGAIN, which is an API violation.\n");
             }
-            av_packet_unref(&pkt);
         }
+        av_packet_unref(&pkt);
     }
 }
 
@@ -145,15 +159,19 @@ static void* audio_decode_thread(void *arg)
         got_frame = audio_decode_frame(is->p_acodec_ctx, &is->audio_pkt_queue, p_frame);
         if (got_frame < 0)
         {
+            printf("got pcm fail\n");
             goto the_end;
         }
-
-        if (got_frame)
+        else if (got_frame > 0)
         {
             tb = (AVRational) { 1, p_frame->sample_rate };
 
-            if (!(af = frame_queue_peek_writable(&is->audio_frm_queue)))
-                goto the_end;
+            //if (!(af = frame_queue_peek_writable(&is->audio_frm_queue)))
+            //    goto the_end;
+            frame_t *af;
+            frame_queue_t *f = &is->audio_frm_queue;
+
+            af = &f->queue[f->windex];
 
             af->pts = (p_frame->pts == AV_NOPTS_VALUE) ? NAN : p_frame->pts * av_q2d(tb);
 
@@ -166,8 +184,20 @@ static void* audio_decode_thread(void *arg)
             av_frame_move_ref(af->frame, p_frame);
             // 更新音频frame队列大小及写指针
             frame_queue_push(&is->audio_frm_queue);
-            //no need unref frame?
+            av_frame_unref(p_frame);
 
+            pthread_mutex_lock(&f->mutex);
+            while (f->size >= f->max_size && !f->pktq->abort_request) {
+                pthread_cond_wait(&f->cond, &f->mutex);
+                if (is->seek_flags & (1 << 5)) {
+                    break;
+                }
+            }
+            pthread_mutex_unlock(&f->mutex);
+
+            if (f->pktq->abort_request) {
+                continue;
+            }
         }
     }
 
@@ -191,9 +221,10 @@ int open_audio_stream(player_stat_t *is)
     p_codec = avcodec_find_decoder(p_codec_par->codec_id);
     if (p_codec == NULL)
     {
-        av_log(NULL, AV_LOG_ERROR, "Cann't find codec!\n");
+        av_log(NULL, AV_LOG_ERROR, "Cann't find audio codec!\n");
         return -1;
     }
+    printf("open audio codec: %s\n", p_codec->name);
 
     // 1.3 构建解码器AVCodecContext
     // 1.3.1 p_codec_ctx初始化：分配结构体，使用p_codec初始化相应成员为默认值
@@ -222,7 +253,13 @@ int open_audio_stream(player_stat_t *is)
     is->p_acodec_ctx = p_codec_ctx;
 
     // 2. 创建视频解码线程
-    CheckFuncResult(pthread_create(&is->audioDecode_tid, NULL, audio_decode_thread, is));
+    prctl(PR_SET_NAME, "audio_decode");
+    ret = pthread_create(&is->audioDecode_tid, NULL, audio_decode_thread, (void *)is);
+    if (ret != 0) {
+        av_log(NULL, AV_LOG_ERROR, "audio_decode_thread create failed!\n");
+        is->audioDecode_tid = 0;
+        return ret;
+    }
 
     return 0;
 }
@@ -282,12 +319,17 @@ static int audio_resample(player_stat_t *is, int64_t audio_callback_time)
 
 replay:
     if (is->paused)
-        return -1;
+        return AVERROR(EAGAIN);
 
-    if (is->seek_flags & (1 << 5))
-    {
-        frame_queue_flush(&is->audio_frm_queue);
-        is->seek_flags &= ~(1 << 5);
+recheck:
+    while (is->seek_flags & (1 << 5)) {
+        pthread_cond_signal(&is->audio_frm_queue.cond);
+        av_usleep(10 * 1000);
+    }
+
+    while(is->no_pkt_buf && !is->abort_request) {
+        av_usleep(10 * 1000);
+        goto recheck;
     }
 
     // 若队列头部可读，则由af指向可读帧
@@ -295,7 +337,7 @@ replay:
     //    return -1;
     pthread_mutex_lock(&f->mutex);
     while (f->size - f->rindex_shown <= 0 && !f->pktq->abort_request) {
-        printf("wait for audio frame\n");
+        // printf("wait for audio frame\n");
         if (!is->audio_complete && is->eof && is->audio_pkt_queue.nb_packets == 0)
         {
             is->audio_complete = 1;
@@ -452,7 +494,7 @@ static void* audio_playing_thread(void *arg)
     player_stat_t *is = (player_stat_t *)arg;
     int audio_size, len1,len;
     int pause = 0;
-    int last_pause =0;
+    static int last_pause;
 
     printf("audio playing thread in\n");
 
@@ -468,7 +510,9 @@ static void* audio_playing_thread(void *arg)
         audio_size = audio_resample(is, audio_callback_time);
         if (audio_size == AVERROR_EOF)
             break;
-        else if (audio_size < 0)
+        else if (audio_size == AVERROR_EXIT)
+            continue;
+        else if (audio_size == AVERROR(EAGAIN))
         {
             /* if error, just output silence */
             pause = 1;
@@ -498,20 +542,22 @@ static void* audio_playing_thread(void *arg)
             long long duration = (is->p_fmt_ctx->duration + (is->p_fmt_ctx->duration <= INT64_MAX - 5000 ? 5000 : 0)) / AV_TIME_BASE;
 
             if (is->playerController.fpPlayAudio)
-                is->playerController.fpPlayAudio(is->p_audio_frm, is->audio_frm_size);
+                is->playerController.fpPlayAudio(is->p_audio_frm, is->audio_frm_size, &is->audio_write_buf_size);
         }
 
         // is->audio_write_buf_size是本帧中尚未拷入SDL音频缓冲区的数据量
         //is->audio_write_buf_size = is->audio_frm_size - is->audio_cp_index;
-        is->audio_hw_buf_size = MI_AUDIO_SAMPLE_PER_FRAME * MI_AUDIO_MAX_FRAME_NUM * 8;
+        //is->audio_hw_buf_size = MI_AUDIO_SAMPLE_PER_FRAME * MI_AUDIO_MAX_FRAME_NUM * 8;
         /* Let's assume the audio driver that is used by SDL has two periods. */
         // 3. 更新时钟
         if (!isnan(is->audio_clock))
         {
+            audio_callback_time = av_gettime_relative();
+            //printf("audio call back time : %lld\n", audio_callback_time);
             // 更新音频时钟，更新时刻：每次往声卡缓冲区拷入数据后
             // 前面audio_decode_frame中更新的is->audio_clock是以音频帧为单位，所以此处第二个参数要减去未拷贝数据量占用的时间
             set_clock_at(&is->audio_clk,
-                is->audio_clock - (double)(is->audio_hw_buf_size) / is->audio_param_tgt.bytes_per_sec,
+                is->audio_clock - (double)(is->audio_write_buf_size) / is->audio_param_tgt.bytes_per_sec,
                 is->audio_clock_serial,
                 audio_callback_time / 1000000.0);
             //printf("audio clk: %lf,curtime: %ld,audio_callback_time: %ld\n",is->audio_clock,is->audio_clock_serial,audio_callback_time);
@@ -536,6 +582,7 @@ static void* audio_playing_thread(void *arg)
 
 static int open_audio_playing(void *arg)
 {
+    int ret;
     player_stat_t *is = (player_stat_t *)arg;
 
     // 2.2 根据SsPlayer音频参数构建音频重采样参数
@@ -572,7 +619,13 @@ static int open_audio_playing(void *arg)
        we correct audio sync only if larger than this threshold */
     is->audio_diff_threshold = (double)(is->audio_hw_buf_size) / is->audio_param_tgt.bytes_per_sec;
 
-    CheckFuncResult(pthread_create(&is->audioPlay_tid, NULL, audio_playing_thread, is));
+    prctl(PR_SET_NAME, "audio_play");
+    ret = pthread_create(&is->audioPlay_tid, NULL, audio_playing_thread, is);
+    if (ret != 0) {
+        av_log(NULL, AV_LOG_ERROR, "audio_playing_thread create failed!\n");
+        is->audioPlay_tid = 0;
+        return ret;
+    }
 
     return 0;
 }
@@ -647,13 +700,30 @@ static void sdl_audio_callback(void *opaque, uint8_t *stream, int len)
 
 int open_audio(player_stat_t *is)
 {
-    if (is && !is->play_error && is->audio_idx >= 0)
-    {
-        open_audio_stream(is);       
-        open_audio_playing(is);
-    }
+    int ret;
 
-    return 0;
+    if (is && is->audio_idx >= 0) 
+    {
+        ret = open_audio_stream(is);
+        if (ret < 0) {
+            av_log(NULL, AV_LOG_ERROR, "open_audio_stream failed!\n");
+            return ret;
+        }
+
+        ret = open_audio_playing(is);
+        if (ret < 0) {
+            av_log(NULL, AV_LOG_ERROR, "open_audio_playing failed!\n");
+            return ret;
+        }
+
+        av_log(NULL, AV_LOG_INFO, "open_audio success!\n");
+        return 0;
+    }
+    else 
+    {
+        av_log(NULL, AV_LOG_ERROR, "open_audio failed!\n");
+        return -1;
+    }
 }
 
 #endif

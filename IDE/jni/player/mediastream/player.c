@@ -29,7 +29,10 @@
 
 AVPacket a_flush_pkt, v_flush_pkt;
 static int av_sync_type = AV_SYNC_AUDIO_MASTER;
+//static int av_sync_type = AV_SYNC_VIDEO_MASTER;
 static float seek_interval = 10;
+
+player_stat_t *g_myplayer = NULL;
 
 //player_stat_t *player_init(const char *p_input_file);
 //int player_deinit(player_stat_t *is);
@@ -127,28 +130,53 @@ static void sync_play_clock_to_slave(play_clock_t *c, play_clock_t *slave)
 
 static void audio_decoder_abort(player_stat_t *is)
 {
+    printf("$0.audio_decoder_abort start!\n");
     packet_queue_abort(&is->audio_pkt_queue);
     frame_queue_signal(&is->audio_frm_queue);
+    pthread_cond_signal(&is->audio_cond);
 
-    pthread_join(is->audioDecode_tid, NULL);
-    pthread_join(is->audioPlay_tid, NULL);
+    if (is->audioDecode_tid)
+        pthread_join(is->audioDecode_tid, NULL); 
+    printf("$1.audioDecode_tid pthread_join exit!\n");
+
+    if (is->audioPlay_tid)
+        pthread_join(is->audioPlay_tid, NULL);
+    printf("$2.audioPlay_tid pthread_join exit!\n");
 
     packet_queue_flush(&is->audio_pkt_queue);
-    printf("audio packet flush done!\n");
+    printf("$3.audio packet_queue_flush exit!\n");
+
     avcodec_free_context(&is->p_acodec_ctx);
+    printf("$4.audio avcodec_free_context exit!\n");
 }
 
 static void video_decoder_abort(player_stat_t *is)
 {
+    printf("#0.video_decoder_abort start!\n");
     packet_queue_abort(&is->video_pkt_queue);
     frame_queue_signal(&is->video_frm_queue);
-    pthread_join(is->videoDecode_tid, NULL);
-    pthread_join(is->videoPlay_tid, NULL);
+    pthread_cond_signal(&is->video_cond);
+
+    if (is->videoDecode_tid)
+        pthread_join(is->videoDecode_tid, NULL);
+    printf("#1.videoDecode_tid pthread_join exit!\n");
+
+    if (is->videoPlay_tid)
+        pthread_join(is->videoPlay_tid, NULL);
+    printf("#2.videoPlay_tid pthread_join exit!\n");
+
+    video_buffer_flush(is);
+    printf("#3.video_flush_buffer free!\n");
 
     packet_queue_flush(&is->video_pkt_queue);
-    printf("video packet flush done!\n");
-    video_buffer_flush(is);
+    printf("#4.video packet_queue_flush free!\n");
+
+    if (is->enable_video && is->playerController.fpResetVideoDisplay)
+        is->playerController.fpResetVideoDisplay();
+    printf("#5.player fpResetVideoDisplay exit!\n");
+
     avcodec_free_context(&is->p_vcodec_ctx);
+    printf("#6.video avcodec_free_context exit!\n");
 }
 
 static void stream_component_close(player_stat_t *is, int stream_index)
@@ -163,16 +191,30 @@ static void stream_component_close(player_stat_t *is, int stream_index)
     switch (codecpar->codec_type) {
     case AVMEDIA_TYPE_AUDIO:
         audio_decoder_abort(is);
-        swr_free(&is->audio_swr_ctx);
-        av_freep(&is->p_audio_frm);
+        if (is->audio_swr_ctx)
+            swr_free(&is->audio_swr_ctx);
+        printf("$5.audio_swr_ctx free!\n");
+        if (is->p_audio_frm)
+            av_freep(&is->p_audio_frm);
+        printf("$6.p_audio_frm free!\n");
         is->audio_frm_size = 0;
         is->audio_frm_rwr_size = 0;
         is->audio_frm_rwr = NULL;
         break;
     case AVMEDIA_TYPE_VIDEO:
         video_decoder_abort(is);
-        sws_freeContext(is->img_convert_ctx);
-        av_frame_free(&is->p_frm_yuv);
+        if (is->img_convert_ctx)
+            sws_freeContext(is->img_convert_ctx);
+        printf("#7.img_convert_ctx free!\n");
+        if (is->p_frm_yuv)
+            av_frame_free(&is->p_frm_yuv);
+        printf("#8.av_frame_free p_frm_yuv!\n");
+        if (is->vir_addr && is->phy_addr) {
+            MI_SYS_FlushInvCache(is->vir_addr, is->buf_size);
+            MI_SYS_Munmap(is->vir_addr, is->buf_size);
+            MI_SYS_MMA_Free(is->phy_addr);
+        }
+        printf("#9.MI_SYS_Munmap and MI_SYS_MMA_Free!\n");
         break;
 
     default:
@@ -191,6 +233,19 @@ static void stream_component_close(player_stat_t *is, int stream_index)
         break;
     default:
         break;
+    }
+}
+
+static void set_player_defaults(player_stat_t *is)
+{
+    if (is) {
+        memset(is, 0x00, sizeof(player_stat_t));
+
+        is->video_idx  = -1;
+        is->audio_idx  = -1;
+        is->video_complete = 1;
+        is->audio_complete = 1;
+        is->display_mode = E_MI_DISP_ROTATE_NONE;
     }
 }
 
@@ -220,7 +275,7 @@ static void* idle_thread(void *arg)
         }
         else
         {
-            if (is->audio_complete && is->video_complete)
+            if ((is->enable_video || is->enable_audio) && is->audio_complete && is->video_complete)
             {
                 if (is->playerController.fpPlayComplete)
                 {
@@ -245,6 +300,8 @@ player_stat_t *player_init(const char *p_input_file)
     {
         return NULL;
     }
+    set_player_defaults(is);
+    g_myplayer = is;
 
     is->filename = av_strdup(p_input_file);
     if (is->filename == NULL)
@@ -282,6 +339,11 @@ player_stat_t *player_init(const char *p_input_file)
     init_clock(&is->video_clk, &is->video_pkt_queue.serial);
     init_clock(&is->audio_clk, &is->audio_pkt_queue.serial);
 
+    pthread_mutex_init(&is->audio_mutex, NULL);
+    pthread_mutex_init(&is->audio_mutex, NULL);
+    pthread_cond_init(&is->audio_cond, NULL);
+    pthread_cond_init(&is->video_cond, NULL);
+
     is->abort_request = 0;
     is->av_sync_type  = av_sync_type;
     is->play_error    = 0;
@@ -304,46 +366,64 @@ fail:
 
 int player_deinit(player_stat_t *is)
 {
-    printf("player_deinit start\n");
+    printf("00.player_deinit start\n");
     
     /* XXX: use a special url_shutdown call to abort parse cleanly */
     is->abort_request = 1;
-    
+    is->seek_flags = 0;
+
     // 如果运行期间没有错误或者解码速度不够,按正常流程退出
     if (true == is->demux_status)
     {
-        pthread_join(is->read_tid, NULL);
-
+        if(is->read_tid != 0)
+            pthread_join(is->read_tid, NULL);
+        printf("01.demux read_tid pthread finish\n");
         /* close each stream */
         if (is->audio_idx >= 0)
         {
             stream_component_close(is, is->audio_idx);
-            printf("audio stream_component_close finish\n");
+            printf("02.audio stream_component_close finish\n");
         }
         if (is->video_idx >= 0)
         {
             stream_component_close(is, is->video_idx);
-            printf("video stream_component_close finish\n");
+            printf("03.video stream_component_close finish\n");
         }
 
+        av_dict_free(&is->p_dict);
+        printf("04.av_dict_free finish!\n");
+
         avformat_close_input(&is->p_fmt_ctx);
-        printf("avformat_close_input finish!\n");
+        printf("05.avformat_close_input finish!\n");
     }
     /* free all pictures */
     packet_queue_destroy(&is->video_pkt_queue);
-    printf("video packet_queue_destroy!\n");
+    printf("06.video packet_queue_destroy!\n");
+    
     packet_queue_destroy(&is->audio_pkt_queue);
-    printf("audio packet_queue_destroy!\n");
+    printf("07.audio packet_queue_destroy!\n");
+    
     frame_queue_destory(&is->video_frm_queue);
-    printf("video frame_queue_destory!\n");
+    printf("08.video frame_queue_destory!\n");
+    
     frame_queue_destory(&is->audio_frm_queue);
-    printf("audio frame_queue_destory!\n");
+    printf("09.audio frame_queue_destory!\n");
+
+    pthread_mutex_destroy(&is->audio_mutex);
+    pthread_mutex_destroy(&is->video_mutex);
+    pthread_cond_destroy(&is->audio_cond);
+    pthread_cond_destroy(&is->video_cond);
+    
     pthread_cond_destroy(&is->continue_read_thread);
-    printf("pthread_cond_destroy!\n");
-    av_free(is->filename);
-    printf("av_free filename!\n");
+    printf("10.read pthread_cond_destroy!\n");
+    
+    av_free(is->filename);  
+    printf("11.av_free filename!\n");
+    
     av_freep(&is);
-    printf("av_free is!\n");
+    printf("12.av_free is!\n");
+
+    printf("##### player_deinit exit #####\n");
 
     return 0;
 }
