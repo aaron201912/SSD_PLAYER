@@ -38,6 +38,7 @@
 static void sdl_audio_callback(void *opaque, uint8_t *stream, int len);
 extern AVPacket a_flush_pkt;
 
+#ifndef SUPPORT_PLAYER_PROCESS
 // 从packet_queue中取一个packet，解码生成frame
 static int audio_decode_frame(AVCodecContext *p_codec_ctx, packet_queue_t *p_pkt_queue, AVFrame *frame)
 {
@@ -725,5 +726,6 @@ int open_audio(player_stat_t *is)
         return -1;
     }
 }
+#endif
 
 #endif

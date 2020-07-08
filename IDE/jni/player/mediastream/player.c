@@ -34,6 +34,7 @@ static float seek_interval = 10;
 
 player_stat_t *g_myplayer = NULL;
 
+#ifndef SUPPORT_PLAYER_PROCESS
 //player_stat_t *player_init(const char *p_input_file);
 //int player_deinit(player_stat_t *is);
 static int get_master_sync_type(player_stat_t *is) {
@@ -339,7 +340,7 @@ player_stat_t *player_init(const char *p_input_file)
     init_clock(&is->video_clk, &is->video_pkt_queue.serial);
     init_clock(&is->audio_clk, &is->audio_pkt_queue.serial);
 
-    pthread_mutex_init(&is->audio_mutex, NULL);
+    pthread_mutex_init(&is->video_mutex, NULL);
     pthread_mutex_init(&is->audio_mutex, NULL);
     pthread_cond_init(&is->audio_cond, NULL);
     pthread_cond_init(&is->video_cond, NULL);
@@ -462,5 +463,7 @@ void stream_seek(player_stat_t *is, int64_t pos, int64_t rel, int seek_by_bytes)
         pthread_cond_signal(&is->continue_read_thread);
     }
 }
+
+#endif
 #endif
 

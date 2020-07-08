@@ -6,6 +6,7 @@
 
 extern AVPacket a_flush_pkt, v_flush_pkt;
 
+#ifndef SUPPORT_PLAYER_PROCESS
 static int decode_interrupt_cb(void *ctx)
 {
     player_stat_t *is = (player_stat_t *)ctx;
@@ -425,5 +426,5 @@ int open_demux(player_stat_t *is)
 
     return 0;
 }
-
+#endif
 #endif

@@ -1,6 +1,7 @@
 ﻿#ifdef SUPPORT_PLAYER_MODULE
 #include "packet.h"
 
+#ifndef SUPPORT_PLAYER_PROCESS
 int packet_queue_init(packet_queue_t *q)
 {
     memset(q, 0, sizeof(packet_queue_t));
@@ -146,5 +147,5 @@ void packet_queue_abort(packet_queue_t *q)
 
     pthread_mutex_unlock(&q->mutex);
 }
-
+#endif
 #endif

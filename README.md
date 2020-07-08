@@ -87,12 +87,22 @@ tool:
 	echo 1024x600.bin > /sys/bus/i2c/devices/1-005d/gtcfg
 	echo 800x480.bin > /sys/bus/i2c/devices/1-005d/gtcfg
 
+多进程播放器运行说明：
+        增加播放器与UI独立进程的模式, 通过配置Makefile中CONFIG_MULTIPROC_SWITCH选项决定是否开启
+        使用sdk下zk_full例程演示, 运行多进程播放器按如下操作.
+        1.cd myplayer
+        2.make clean;make 
+        3.将生成的MyPlayer拷贝到板子/customer分区
+        4.在IDE中修改Makefile, 设置CONFIG_MULTIPROC_SWITCH := "enable", 将编译出来的libzkgui.so拷贝到板子/customer分区
+        5.cd /customer/lib, 运行：export LD_LIBRARY_PATH=/lib:/customer/libdns:/config/wifi:$PWD:$LD_LIBRARY_PATH
+        6.cd /customer, 首先运行：./MyPlayer &, 然后运行：./zkgui &
+
 运行播放器：
 
 	1.将app编译出来的zkgui copy到customer分区；
 	2.将customer_zk的res和lib copy到customer分区；
 	3.将customer_zk的etc下面的文件拷贝到板子/etc下面；
-	4.cd /customer/lib,执行：export LD_LIBRARY_PATH=/lib:/customer/libdns:$PWD:$LD_LIBRARY_PATH
+	4.cd /customer/lib,执行：export LD_LIBRARY_PATH=/lib:/customer/libdns:/config/wifi:$PWD:$LD_LIBRARY_PATH
 	5.运行zkgui: ./zkgui
 	
 	注：如果没有声音可能是功放的gpio没有拉高，可以参考如下步骤拉高：

@@ -25,6 +25,7 @@ extern AVPacket v_flush_pkt;
 struct timeval time_start, time_end;
 int64_t time0, time1;
 
+#ifndef SUPPORT_PLAYER_PROCESS
 static int alloc_for_frame(frame_t *vp, AVFrame *frame)
 {
     int ret;
@@ -1085,4 +1086,5 @@ int open_video(player_stat_t *is)
         return -1;
     }
 }
+#endif
 #endif

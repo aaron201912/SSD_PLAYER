@@ -30,6 +30,7 @@
 * 在Eclipse编辑器中  使用 “alt + /”  快捷键可以打开智能提示
 */
 
+#include <pthread.h>
 #include "tp_player.h"
 
 /**
@@ -42,8 +43,10 @@ static S_ACTIVITY_TIMEER REGISTER_ACTIVITY_TIMER_TAB[] = {
 	//{1,  1000},
 };
 
+#ifdef SUPPORT_PLAYER_MODULE
 static player_control_t g_stPlayStat;
 
+#ifndef SUPPORT_PLAYER_PROCESS
 static int PlayComplete()
 {
 	tp_player_close();
@@ -66,7 +69,40 @@ static void SetPlayerControlCallBack(player_control_t *is)
 	is->fpPlayComplete = PlayComplete;
 	is->fpPlayError = PlayErrorr;
 }
+#else
 
+static bool g_exit = false;
+static pthread_t rtsp_tid;
+
+static void * rtsp_play_process(void * arg)
+{
+	int value;
+
+	printf("get in rtsp_play_process!\n");
+
+	while (!g_exit) {
+		tp_player_status(&value);
+		if (value < 0) {
+			char error_text[20];
+			sprintf(error_text, "rtsp play error : %d", value);
+			printf("rtsp connenct fail!\n");
+			mWindow_errMsgPtr->setVisible(true);
+			mTextview_msgPtr->setText(error_text);
+		} else if (value > 0) {
+			printf("rtsp play url done!\n");
+			tp_player_close();
+			EASYUICONTEXT->goBack();
+		}
+		usleep(100 * 1000);
+	}
+
+	printf("### rtsp_play_process exit ### \n");
+
+	return NULL;
+}
+#endif
+
+#endif
 /**
  * 当界面构造时触发
  */
@@ -82,10 +118,19 @@ static void onUI_init(){
  */
 static void onUI_intent(const Intent *intentPtr) {
     if (intentPtr != NULL) {
+#ifdef SUPPORT_PLAYER_MODULE
+	#ifdef SUPPORT_PLAYER_PROCESS
+    	std::string strUrl = intentPtr->getExtra("url");
+    	tp_player_open(strUrl.c_str(), 0, 0, 1024, 600, NULL);
+    	g_exit = false;
+    	pthread_create(&rtsp_tid, NULL, rtsp_play_process, (void *)NULL);
+	#else
     	std::string strUrl = intentPtr->getExtra("url");
 
     	SetPlayerControlCallBack(&g_stPlayStat);
 		tp_player_open(strUrl.c_str(), 0, 0, 1024, 600, &g_stPlayStat);
+	#endif
+#endif
     }
 }
 
@@ -107,7 +152,14 @@ static void onUI_hide() {
  * 当界面完全退出时触发
  */
 static void onUI_quit() {
+#ifdef SUPPORT_PLAYER_MODULE
+	#ifdef SUPPORT_PLAYER_PROCESS
+	g_exit = true;
+	pthread_join(rtsp_tid, NULL);
+	#else
 	tp_player_close();
+	#endif
+#endif
 }
 
 /**
@@ -166,7 +218,9 @@ static bool onButtonClick_sys_back(ZKButton *pButton) {
 static bool onButtonClick_Button_confirm(ZKButton *pButton) {
     //LOGD(" ButtonClick Button_confirm !!!\n");
 	mWindow_errMsgPtr->setVisible(false);
+#ifdef SUPPORT_PLAYER_MODULE
 	tp_player_close();
+#endif
 	EASYUICONTEXT->goBack();
     return false;
 }

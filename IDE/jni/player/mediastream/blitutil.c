@@ -8,6 +8,8 @@
 #include <string.h>
 #include <stdio.h>
 #define min(a, b) ((a < b) ? a : b)
+
+#ifndef SUPPORT_PLAYER_PROCESS
 void extractSquareClip_NxN(RECT_t src, RECT_t **clipA, int *clipN, int N)
 {
     int clipNum = 0;
@@ -559,4 +561,5 @@ void SstarBlitNormal(Surface_t *pSrcSurface, Surface_t *pDstSurface, RECT_t *pRe
     MI_GFX_BitBlit(&stSrc, &stSrcRect, &stDst, &stDstRect, &stOpt, &u16Fence);
     MI_GFX_WaitAllDone(FALSE, u16Fence);
 }
+#endif
 #endif
