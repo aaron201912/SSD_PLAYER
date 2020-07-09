@@ -102,12 +102,12 @@ static int queue_picture(player_stat_t *is, AVFrame *src_frame, double pts, doub
     // 将AVFrame拷入队列相应位置
     if (is->decode_type == SOFT_DECODING)
     {
-        //av_frame_move_ref(vp->frame, src_frame);
-        ret = alloc_for_frame(vp, src_frame);
+        av_frame_move_ref(vp->frame, src_frame);
+        /*ret = alloc_for_frame(vp, src_frame);
         if (ret < 0) {
             av_log(NULL, AV_LOG_ERROR, "alloc_for_frame failed!\n");
             return 0;
-        }
+        }*/
         //printf("queue frame fomat: %d\n",vp->frame->format);
         // 更新队列计数及写索引
         //printf("before queue ridx: %d,widx: %d,size: %d,maxsize: %d\n ",is->video_frm_queue.rindex,is->video_frm_queue.windex,is->video_frm_queue.size,is->video_frm_queue.max_size);
@@ -124,9 +124,6 @@ static int queue_picture(player_stat_t *is, AVFrame *src_frame, double pts, doub
             vp->frame->pts    = src_frame->pts;
             vp->frame->format = src_frame->format;
             frame_queue_push(&is->video_frm_queue);
-            if (is->seek_flags & (1 << 8)) {
-                av_log(NULL, AV_LOG_ERROR, "not get in here!\n");
-            }
         }
     }
 
@@ -910,11 +907,7 @@ static int open_video_stream(player_stat_t *is)
         return -1;
     }
 
-    // 硬解时选择VDEC缩小画面,传入宽高,由于VDEC只能缩小这里对宽高进行判断
-    //p_codec_ctx->flags  = FFMIN(ALIGN_BACK(is->out_width , 32), ALIGN_BACK(p_codec_par->width , 32));
-    //p_codec_ctx->flags2 = FFMIN(ALIGN_BACK(is->out_height, 32), ALIGN_BACK(p_codec_par->height, 32));
-
-    if ((is->in_width > is->in_height && p_codec_par->width < p_codec_par->height)
+    /*if ((is->in_width > is->in_height && p_codec_par->width < p_codec_par->height)
      || (is->in_width < is->in_height && p_codec_par->width > p_codec_par->height)) {
         is->display_mode = E_MI_DISP_ROTATE_270;    // 如果视频的宽高与显示屏的宽高不匹配自动旋转270度
         tmp = is->in_width;
@@ -922,10 +915,10 @@ static int open_video_stream(player_stat_t *is)
         is->in_height = tmp;                        // 交换宽高
     } else {
         is->display_mode = E_MI_DISP_ROTATE_NONE;
-    }
+    }*/
 
     if (is->decode_type == HARD_DECODING) {
-        if (1.0 * p_codec_par->width / p_codec_par->height > 1.0 * is->in_width / is->in_height) {
+        /*if (1.0 * p_codec_par->width / p_codec_par->height > 1.0 * is->in_width / is->in_height) {
             is->out_width  = is->in_width;
             is->out_height = is->in_width * p_codec_par->height / p_codec_par->width;
             is->src_width  = FFMIN(p_codec_par->width , is->out_width);
@@ -953,17 +946,33 @@ static int open_video_stream(player_stat_t *is)
                 is->pos_x = FFMAX((is->in_width - is->out_width) / 2, 0);
                 is->pos_y = 0;
             }
-        }
+        }*/
+
         if (is->display_mode != E_MI_DISP_ROTATE_NONE) {
+            p_codec_ctx->flags  = FFMIN(ALIGN_BACK(is->in_height, 32), ALIGN_BACK(p_codec_par->width , 32));
+            p_codec_ctx->flags2 = FFMIN(ALIGN_BACK(is->in_width , 32), ALIGN_BACK(p_codec_par->height, 32));
+            is->out_width  = is->in_width;
+            is->out_height = is->in_height;
+            is->src_width  = FFMIN(is->out_height, p_codec_par->width);
+            is->src_height = FFMIN(is->out_width , p_codec_par->height);
+            // 使用disp旋转时需要开启tilemode
             p_codec_ctx->flags |= (1 << 17);
             av_log(NULL, AV_LOG_WARNING, "set rotate attribute!\n");
+        } else {
+            // 硬解时选择VDEC缩小画面,传入宽高,由于VDEC只能缩小这里对宽高进行判断
+            p_codec_ctx->flags  = FFMIN(ALIGN_BACK(is->in_width , 32), ALIGN_BACK(p_codec_par->width , 32));
+            p_codec_ctx->flags2 = FFMIN(ALIGN_BACK(is->in_height, 32), ALIGN_BACK(p_codec_par->height, 32));
+            is->out_width  = is->in_width;
+            is->out_height = is->in_height;
+            is->src_width  = FFMIN(is->out_width , p_codec_par->width);
+            is->src_height = FFMIN(is->out_height, p_codec_par->height);
         }
+
         printf("vdec out w/h = [%d %d], display x/y/w/h = [%d %d %d %d]\n", 
         (p_codec_ctx->flags & 0xFFFF), (p_codec_ctx->flags2 & 0xFFFF), is->pos_x, is->pos_y, is->out_width, is->out_height);
     }
     else {
-        // 针对竖屏进行旋转设置
-        if (is->display_mode != E_MI_DISP_ROTATE_NONE) {
+        /*if (is->display_mode != E_MI_DISP_ROTATE_NONE) {
             // 根据输入信号的横竖属性设置显示窗口
             if (p_codec_ctx->width > p_codec_ctx->height) {
                 is->src_height = FFMIN(p_codec_ctx->width , is->in_width);
@@ -1004,6 +1013,15 @@ static int open_video_stream(player_stat_t *is)
                 is->dst_width  = FFMIN(p_codec_ctx->width, 1080);
                 is->dst_height = FFMIN(p_codec_ctx->height, 1920);
             }
+        }*/
+        is->out_width  = is->in_width;
+        is->out_height = is->in_height;
+        if (is->display_mode != E_MI_DISP_ROTATE_NONE) {
+            is->src_width  = FFMIN(is->out_width , p_codec_par->height);
+            is->src_height = FFMIN(is->out_height, p_codec_par->width);
+        } else {
+            is->src_width  = FFMIN(is->out_width , p_codec_par->width);
+            is->src_height = FFMIN(is->out_height, p_codec_par->height);
         }
         printf("scaler src w/h = [%d %d], dst x/y/w/h = [%d %d %d %d]\n", is->src_width, is->src_height, is->pos_x, is->pos_y, is->out_width, is->out_height);
     }

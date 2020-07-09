@@ -655,12 +655,11 @@ static MI_S32 SetVideoDisplay(void)
 
     if (g_pstPlayStat->decode_type == SOFT_DECODING)
     {
-        MI_SYS_ChnPort_t stDivpChnPort;
         MI_DIVP_ChnAttr_t stDivpChnAttr;
         MI_DIVP_OutputPortAttr_t stOutputPortAttr;
         MI_DISP_InputPortAttr_t stInputPortAttr;
         MI_SYS_ChnPort_t stDispChnPort;
-        MI_SYS_ChnPort_t stDiVpChnPort;
+        MI_SYS_ChnPort_t stDivpChnPort;
 
         MI_GFX_Open();
 
@@ -672,6 +671,11 @@ static MI_S32 SetVideoDisplay(void)
         stInputPortAttr.stDispWin.u16Y      = g_pstPlayStat->pos_y;
         stInputPortAttr.stDispWin.u16Width  = g_pstPlayStat->out_width;
         stInputPortAttr.stDispWin.u16Height = g_pstPlayStat->out_height;
+
+        MI_DISP_DisableInputPort(DISP_LAYER, DISP_INPUTPORT);
+        MI_DISP_SetInputPortAttr(DISP_LAYER, DISP_INPUTPORT, &stInputPortAttr);
+        MI_DISP_EnableInputPort(DISP_LAYER, DISP_INPUTPORT);
+        MI_DISP_SetInputPortSyncMode(DISP_LAYER, DISP_INPUTPORT, E_MI_DISP_SYNC_MODE_FREE_RUN);
 
         memset(&stDivpChnAttr, 0, sizeof(MI_DIVP_ChnAttr_t));
         stDivpChnAttr.bHorMirror            = FALSE;
@@ -695,11 +699,6 @@ static MI_S32 SetVideoDisplay(void)
         stOutputPortAttr.u32Width           = ALIGN_DOWN(g_pstPlayStat->src_width , 32);
         stOutputPortAttr.u32Height          = ALIGN_DOWN(g_pstPlayStat->src_height, 32);
         MI_DIVP_SetOutputPortAttr(0, &stOutputPortAttr);
-
-        MI_DISP_DisableInputPort(DISP_LAYER, DISP_INPUTPORT);
-        MI_DISP_SetInputPortAttr(DISP_LAYER, DISP_INPUTPORT, &stInputPortAttr);
-        MI_DISP_EnableInputPort(DISP_LAYER, DISP_INPUTPORT);
-        MI_DISP_SetInputPortSyncMode(DISP_LAYER, DISP_INPUTPORT, E_MI_DISP_SYNC_MODE_FREE_RUN);
 
         memset(&stDispChnPort, 0, sizeof(MI_SYS_ChnPort_t));
         stDispChnPort.eModId                = E_MI_MODULE_ID_DISP;
@@ -729,13 +728,8 @@ static MI_S32 SetVideoDisplay(void)
         stInputPortAttr.u16SrcHeight        = ALIGN_DOWN(g_pstPlayStat->src_height, 32);
         stInputPortAttr.stDispWin.u16X      = g_pstPlayStat->pos_x;
         stInputPortAttr.stDispWin.u16Y      = g_pstPlayStat->pos_y;
-        if (g_pstPlayStat->display_mode != E_MI_DISP_ROTATE_NONE) {
-            stInputPortAttr.stDispWin.u16Width  = g_pstPlayStat->out_height;
-            stInputPortAttr.stDispWin.u16Height = g_pstPlayStat->out_width;
-        } else {
-            stInputPortAttr.stDispWin.u16Width  = g_pstPlayStat->out_width;
-            stInputPortAttr.stDispWin.u16Height = g_pstPlayStat->out_height;
-        }
+        stInputPortAttr.stDispWin.u16Width  = g_pstPlayStat->out_width;
+        stInputPortAttr.stDispWin.u16Height = g_pstPlayStat->out_height;
 
         MI_DISP_DisableInputPort(DISP_LAYER, DISP_INPUTPORT);
         MI_DISP_SetInputPortAttr(DISP_LAYER, DISP_INPUTPORT, &stInputPortAttr);
@@ -743,7 +737,7 @@ static MI_S32 SetVideoDisplay(void)
         MI_DISP_SetInputPortSyncMode(DISP_LAYER, DISP_INPUTPORT, E_MI_DISP_SYNC_MODE_FREE_RUN);
         MI_DISP_ShowInputPort(DISP_LAYER, DISP_INPUTPORT);
         // 硬解时使用DISP旋转
-        stRotateConfig.eRotateMode = g_pstPlayStat->display_mode;
+        stRotateConfig.eRotateMode = (MI_DISP_RotateMode_e)g_pstPlayStat->display_mode;
     }
 
     MI_DISP_SetVideoLayerRotateMode(DISP_LAYER, &stRotateConfig);
@@ -888,38 +882,34 @@ MI_S32 DisplayVideo(void *pData, bool bState)
         stBufConf.stFrameCfg.eFrameScanMode = E_MI_SYS_FRAME_SCAN_MODE_PROGRESSIVE;
         stBufConf.stFrameCfg.stFrameBufExtraConf.u16BufHAlignment = 16;
 
-        if (g_pstPlayStat->display_mode == E_MI_DISP_ROTATE_NONE)
-        {
+        if (g_pstPlayStat->display_mode == E_MI_DISP_ROTATE_NONE) {
             stBufConf.stFrameCfg.u16Width  = pFrame->width;
             stBufConf.stFrameCfg.u16Height = pFrame->height;
-        } else
-        {
+        } else {
             stBufConf.stFrameCfg.u16Width  = pFrame->height;
             stBufConf.stFrameCfg.u16Height = pFrame->width;
         }
 
-        MI_SYS_SetChnMMAConf(E_MI_MODULE_ID_DIVP, 0, 0, (MI_U8 *)"MMU_MMA");
-        if(MI_SUCCESS == MI_SYS_ChnInputPortGetBuf(&stInputChnPort, &stBufConf, &stBufInfo, &hHandle, -1))
+        //MI_SYS_SetChnMMAConf(E_MI_MODULE_ID_DIVP, 0, 0, (MI_U8 *)"MMU_MMA");
+        if(MI_SUCCESS == MI_SYS_ChnInputPortGetBuf(&stInputChnPort, &stBufConf, &stBufInfo, &hHandle, 0))
         {
-            stBufInfo.stFrameData.eCompressMode = E_MI_SYS_COMPRESS_MODE_NONE;
-            stBufInfo.stFrameData.eFieldType    = E_MI_SYS_FIELDTYPE_NONE;
-            stBufInfo.stFrameData.eTileMode     = E_MI_SYS_FRAME_TILE_MODE_NONE;
-            stBufInfo.bEndOfStream              = FALSE;
-
             if (g_pstPlayStat->display_mode == E_MI_DISP_ROTATE_NONE)
             {
+                stBufInfo.stFrameData.eCompressMode = E_MI_SYS_COMPRESS_MODE_NONE;
+                stBufInfo.stFrameData.eFieldType    = E_MI_SYS_FIELDTYPE_NONE;
+                stBufInfo.stFrameData.eTileMode     = E_MI_SYS_FRAME_TILE_MODE_NONE;
+                stBufInfo.bEndOfStream              = FALSE;
+
+                int length = g_pstPlayStat->p_frm_yuv->width * g_pstPlayStat->p_frm_yuv->height;
                 for (int index = 0; index < stBufInfo.stFrameData.u16Height; index ++)
                 {
-                    memcpy(stBufInfo.stFrameData.pVirAddr[0] + index * stBufInfo.stFrameData.u32Stride[0],
-                           pFrame->data[0] + index * stBufInfo.stFrameData.u16Width,
-                           stBufInfo.stFrameData.u16Width);
+                    MI_SYS_MemcpyPa(stBufInfo.stFrameData.phyAddr[0] + index * stBufInfo.stFrameData.u32Stride[0],
+                    g_pstPlayStat->phy_addr + index * g_pstPlayStat->p_frm_yuv->width, g_pstPlayStat->p_frm_yuv->width);
                 }
-
                 for (int index = 0; index < stBufInfo.stFrameData.u16Height / 2; index ++)
                 {
-                    memcpy(stBufInfo.stFrameData.pVirAddr[1] + index * stBufInfo.stFrameData.u32Stride[1],
-                           pFrame->data[1] + index * stBufInfo.stFrameData.u16Width,
-                           stBufInfo.stFrameData.u16Width);
+                    MI_SYS_MemcpyPa(stBufInfo.stFrameData.phyAddr[1] + index * stBufInfo.stFrameData.u32Stride[1],
+                    g_pstPlayStat->phy_addr + length + index * g_pstPlayStat->p_frm_yuv->width, g_pstPlayStat->p_frm_yuv->width);
                 }
             }
             else
@@ -1399,6 +1389,15 @@ retry:
 		printf("Initilize player failed!\n");
 		return;
 	}
+	// 旋转开关
+    #if ENABLE_ROTATE
+	g_pstPlayStat->display_mode = E_MI_DISP_ROTATE_270;
+    #else
+	g_pstPlayStat->display_mode = E_MI_DISP_ROTATE_NONE;
+	#endif
+	// 设置视频显示位置与窗口
+	g_pstPlayStat->pos_x = 0;
+	g_pstPlayStat->pos_y = 0;
 	g_pstPlayStat->in_width  = g_playViewWidth;
 	g_pstPlayStat->in_height = g_playViewHeight;
 	printf("video file name is : %s, panel w/h = [%d %d]\n", g_pstPlayStat->filename, g_playViewWidth, g_playViewHeight);

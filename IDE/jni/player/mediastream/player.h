@@ -64,7 +64,7 @@ extern "C" {               // 告诉编译器下列代码要以C链接约定的�
 #define MAX_AUDIO_FRAME_SIZE 192000
 
 #define MIN_QUEUE_SIZE      (50 * 1024)
-#define MAX_QUEUE_SIZE      (3 * 1024 * 1024)
+#define MAX_QUEUE_SIZE      (5 * 1024 * 1024)
 #define MIN_FRAMES 25
 
 /* Minimum SDL audio buffer size, in samples. */
