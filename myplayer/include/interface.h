@@ -36,6 +36,7 @@ int my_player_getposition(double *position);
 int my_player_getduration(double *duration);
 int my_player_set_chlayout(int soundmode);
 int my_player_set_aodev(int dev);
+int my_player_set_rotate(int rotate);
 int my_player_set_volumn(int volumn);
 int my_player_set_mute(bool mute);
 

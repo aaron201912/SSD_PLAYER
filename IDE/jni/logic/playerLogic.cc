@@ -76,6 +76,7 @@ typedef struct{
     double misc;
     int aodev, volumn;
     int status;
+    int rotate;
     bool mute;
     char filePath[512];
 }stPlayerData;
@@ -893,6 +894,9 @@ MI_S32 DisplayVideo(void *pData, bool bState)
         //MI_SYS_SetChnMMAConf(E_MI_MODULE_ID_DIVP, 0, 0, (MI_U8 *)"MMU_MMA");
         if(MI_SUCCESS == MI_SYS_ChnInputPortGetBuf(&stInputChnPort, &stBufConf, &stBufInfo, &hHandle, 0))
         {
+            if (g_pstPlayStat->p_frm_yuv->width * g_pstPlayStat->p_frm_yuv->height < 1024 * 600) {
+                MI_SYS_FlushInvCache(g_pstPlayStat->vir_addr, g_pstPlayStat->buf_size);
+            }
             if (g_pstPlayStat->display_mode == E_MI_DISP_ROTATE_NONE)
             {
                 stBufInfo.stFrameData.eCompressMode = E_MI_SYS_COMPRESS_MODE_NONE;
@@ -1333,6 +1337,12 @@ static void StartPlayStreamFile(char *pFileName)
     strcpy(sendevt.stPlData.filePath, pFileName);
     printf("list file name to play = %s\n", sendevt.stPlData.filePath);
 
+	// 旋转开关
+    #if ENABLE_ROTATE
+    sendevt.stPlData.rotate = E_MI_DISP_ROTATE_270;
+    #else
+    sendevt.stPlData.rotate = E_MI_DISP_ROTATE_NONE;
+    #endif
     sendevt.stPlData.x = 0;
     sendevt.stPlData.y = 0;
     sendevt.stPlData.width  = g_playViewWidth;

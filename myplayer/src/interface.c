@@ -18,6 +18,7 @@ Note: 调用以下接口需要加上互斥锁
 static pthread_mutex_t myplayer_mutex = PTHREAD_MUTEX_INITIALIZER;
 static player_stat_t *ssplayer = NULL;
 static bool g_mute = false;
+static int g_rotate = E_MI_DISP_ROTATE_NONE;
 
 static void * my_layer_handler(void * arg)
 {
@@ -83,6 +84,7 @@ int my_player_open(const char *fp, uint16_t x, uint16_t y, uint16_t width, uint1
         return -1;
     }
 
+    ssplayer->display_mode = g_rotate;
     ssplayer->in_height = height;
     ssplayer->in_width  = width;
     ssplayer->pos_x = x;
@@ -283,7 +285,7 @@ int my_player_set_chlayout(int soundmode)
 {
     if (soundmode <= 0 || soundmode > 2) {
         NANOX_ERR("invalid sound mode setting!\n");
-        g_audio_chlayout = 0;
+        g_audio_chlayout = AV_CH_LAYOUT_MONO;
         return -1;
     }
 
@@ -305,7 +307,20 @@ int my_player_set_aodev(int dev)
     }
 
     gplayer_AoDevId = dev;
-    NANOX_ERR("my_player_set_aodev[%d]\n", gplayer_AoDevId);
+    NANOX_LOG("my_player_set_aodev[%d]\n", gplayer_AoDevId);
+
+    return 0;
+}
+
+int my_player_set_rotate(int rotate)
+{
+    if (rotate < 0 || rotate > 4) {
+        NANOX_ERR("my_player_set_rotate failed!\n");
+        return -1;
+    }
+
+    g_rotate = rotate;
+    NANOX_LOG("my_player_set_rotate[%d]\n", g_rotate);
 
     return 0;
 }
@@ -317,22 +332,24 @@ int my_player_set_volumn(int volumn)
         return -1;
     }
 
-    MI_S32 vol;
-    MI_AO_ChnState_t stAoState;
+    if (ssplayer->audio_idx >= 0) {
+        MI_S32 vol;
+        MI_AO_ChnState_t stAoState;
 
-    if (volumn) {
-        vol = volumn * (MAX_ADJUST_AO_VOLUME - MIN_ADJUST_AO_VOLUME) / 100 + MIN_ADJUST_AO_VOLUME;
-        vol = (vol > MAX_ADJUST_AO_VOLUME) ? MAX_ADJUST_AO_VOLUME : vol;
-        vol = (vol < MIN_ADJUST_AO_VOLUME) ? MIN_ADJUST_AO_VOLUME : vol;
-    } else {
-        vol = MIN_AO_VOLUME;
-    }
+        if (volumn) {
+            vol = volumn * (MAX_ADJUST_AO_VOLUME - MIN_ADJUST_AO_VOLUME) / 100 + MIN_ADJUST_AO_VOLUME;
+            vol = (vol > MAX_ADJUST_AO_VOLUME) ? MAX_ADJUST_AO_VOLUME : vol;
+            vol = (vol < MIN_ADJUST_AO_VOLUME) ? MIN_ADJUST_AO_VOLUME : vol;
+        } else {
+            vol = MIN_AO_VOLUME;
+        }
 
-    memset(&stAoState, 0, sizeof(MI_AO_ChnState_t));
-    if (MI_SUCCESS == MI_AO_QueryChnStat(AUDIO_DEV, AUDIO_CHN, &stAoState))
-    {
-        MI_AO_SetVolume(AUDIO_DEV, vol);
-        MI_AO_SetMute(AUDIO_DEV, g_mute);
+        memset(&stAoState, 0, sizeof(MI_AO_ChnState_t));
+        if (MI_SUCCESS == MI_AO_QueryChnStat(AUDIO_DEV, AUDIO_CHN, &stAoState))
+        {
+            MI_AO_SetVolume(AUDIO_DEV, vol);
+            MI_AO_SetMute(AUDIO_DEV, g_mute);
+        }
     }
 
     return 0;
@@ -345,8 +362,10 @@ int my_player_set_mute(bool mute)
         return -1;
     }
 
-    g_mute = mute;
-    MI_AO_SetMute(AUDIO_DEV, mute);
+    if (ssplayer->audio_idx >= 0) {
+        g_mute = mute;
+        MI_AO_SetMute(AUDIO_DEV, mute);
+    }
 
     return 0;
 }

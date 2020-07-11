@@ -45,6 +45,7 @@ typedef struct{
     double misc;
     int aodev, volumn;
     int status;
+    int rotate;
     bool mute;
     char filePath[512];
 }stPlayerData;
@@ -195,6 +196,7 @@ int main(int argc, char *argv[])
                     printf("start to play %s, windows = [%d %d %d %d]\n", recvevt.stPlData.filePath, recvevt.stPlData.x,
                     recvevt.stPlData.y, recvevt.stPlData.width, recvevt.stPlData.height);
                     my_player_set_aodev(recvevt.stPlData.aodev);
+                    my_player_set_rotate(recvevt.stPlData.rotate);
                     ret = my_player_open(recvevt.stPlData.filePath, recvevt.stPlData.x, recvevt.stPlData.y, recvevt.stPlData.width, recvevt.stPlData.height);
                     if (ret < 0) {
                         memset(&sendevt,0,sizeof(IPCEvent));
@@ -289,6 +291,8 @@ int main(int argc, char *argv[])
                 break;
 
                 case IPC_COMMAND_EXIT:
+                    my_player_close();
+                    g_playing = false;
                     bExit = true;
                     av_log(NULL, AV_LOG_WARNING, "##### MyPlayer Exit #####\n");
                 break;

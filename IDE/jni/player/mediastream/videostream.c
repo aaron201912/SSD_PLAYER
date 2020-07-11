@@ -37,7 +37,8 @@ static int alloc_for_frame(frame_t *vp, AVFrame *frame)
     }
     //av_log(NULL, AV_LOG_WARNING, "malloc for frame = %d\n", vp->buf_size);
 
-    ret = MI_SYS_MMA_Alloc((MI_U8 *)"MMU_MMA", vp->buf_size, &vp->phy_addr);
+    //ret = MI_SYS_MMA_Alloc((MI_U8 *)"MMU_MMA", vp->buf_size, &vp->phy_addr);
+    ret = MI_SYS_MMA_Alloc((MI_U8 *)"#frame", vp->buf_size, &vp->phy_addr);
     if (ret != MI_SUCCESS) {
         av_log(NULL, AV_LOG_ERROR, "MI_SYS_MMA_Alloc Falied!\n");
         return -1;
@@ -404,8 +405,8 @@ static void video_display(player_stat_t *is)
                   is->p_frm_yuv->data,                    // dst planes
                   is->p_frm_yuv->linesize                 // dst strides
                   );
-        is->p_frm_yuv->width  = vp->frame->width;
-        is->p_frm_yuv->height = vp->frame->height;
+        //is->p_frm_yuv->width  = vp->frame->width;
+        //is->p_frm_yuv->height = vp->frame->height;
         if (is->playerController.fpDisplayVideo) {
             is->playerController.fpDisplayVideo((void *)is->p_frm_yuv, false);
         }
@@ -779,7 +780,8 @@ static int open_video_playing(void *arg)
         //    return -1;
         //}
 
-        ret = MI_SYS_MMA_Alloc((MI_U8 *)"MMU_MMA", is->buf_size, &is->phy_addr);
+        //ret = MI_SYS_MMA_Alloc((MI_U8 *)"MMU_MMA", is->buf_size, &is->phy_addr);
+        ret = MI_SYS_MMA_Alloc((MI_U8 *)"#yuv420p", is->buf_size, &is->phy_addr);
         if (ret != MI_SUCCESS) {
             av_log(NULL, AV_LOG_ERROR, "MI_SYS_MMA_Alloc Falied!\n");
             return -1;

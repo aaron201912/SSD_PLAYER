@@ -635,6 +635,7 @@ int my_audio_deinit(void)
 
     /* disable ao device */
     MI_AO_Disable(AoDevId);
+    return MI_SUCCESS;
 }
 
 int my_audio_init(int nAoDevId)
@@ -689,7 +690,7 @@ int my_audio_init(int nAoDevId)
 
     printf("my_player enable audio[%d] done!\n", AoDevId);
 
-    return 0;
+    return MI_SUCCESS;
 }
 
 

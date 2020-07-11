@@ -116,6 +116,7 @@ static void * demux_thread(void *arg)
  
                 if (is->video_idx >= 0) {
                     pthread_mutex_lock(&is->video_mutex);
+					is->seek_flags |= (1 << 6);
                     packet_queue_flush(&is->video_pkt_queue);
                     packet_queue_put(&is->video_pkt_queue, &v_flush_pkt);
                     is->seek_flags |= (1 << 6);
@@ -262,7 +263,7 @@ static int demux_init(player_stat_t *is)
     // 1. 构建AVFormatContext
     // 1.1 打开视频文件：读取文件头，将文件格式信息存储在"fmt context"中
     av_dict_set(&is->p_dict, "max_delay", "10000000", 0);//设置超时10秒
-    av_dict_set(&is->p_dict, "probesize", "102400", 0); //探测长度设置为100K
+    //av_dict_set(&is->p_dict, "probesize", "102400", 0); //探测长度设置为100K
     gettimeofday(&is->start, NULL);
     //p_fmt_ctx->probesize = 100 * 1024;
     //p_fmt_ctx->format_probesize = 100 * 1024;
@@ -344,7 +345,7 @@ static int demux_init(player_stat_t *is)
 
         if (is->p_video_stream->codecpar->codec_id != AV_CODEC_ID_H264 && is->p_video_stream->codecpar->codec_id != AV_CODEC_ID_HEVC)
         {
-            if (is->p_video_stream->codecpar->width > 1366 && is->p_video_stream->codecpar->height > 768) 
+            if (is->p_video_stream->codecpar->width * is->p_video_stream->codecpar->height > 1280 * 720) 
             {
                 if(a_idx != -1)
                 {
@@ -368,7 +369,7 @@ static int demux_init(player_stat_t *is)
         }
         else 
         {
-            if (is->p_video_stream->codecpar->width > 1920 && is->p_video_stream->codecpar->height > 1080) 
+            if (is->p_video_stream->codecpar->width * is->p_video_stream->codecpar->height > 1920 * 1080) 
             {
                 printf("hard solution of video cannot over 1080P\n");
                 ret = -1;

@@ -44,6 +44,7 @@ typedef struct{
     double misc;
     int aodev, volumn;
     int status;
+    int rotate;
     bool mute;
     char filePath[512];
 }stPlayerData;
@@ -424,12 +425,10 @@ static int sstar_video_display(void *pData, bool bState)
         stBufConf.stFrameCfg.eFrameScanMode = E_MI_SYS_FRAME_SCAN_MODE_PROGRESSIVE;
         stBufConf.stFrameCfg.stFrameBufExtraConf.u16BufHAlignment = 16;
 
-        if (g_is->display_mode == E_MI_DISP_ROTATE_NONE)
-        {
+        if (g_is->display_mode == E_MI_DISP_ROTATE_NONE) {
             stBufConf.stFrameCfg.u16Width  = pFrame->width;
             stBufConf.stFrameCfg.u16Height = pFrame->height;
-        } else
-        {
+        } else {
             stBufConf.stFrameCfg.u16Width  = pFrame->height;
             stBufConf.stFrameCfg.u16Height = pFrame->width;
         }
@@ -437,25 +436,27 @@ static int sstar_video_display(void *pData, bool bState)
         //MI_SYS_SetChnMMAConf(E_MI_MODULE_ID_DIVP, 0, 0, (MI_U8 *)"MMU_MMA");
         if(MI_SUCCESS == MI_SYS_ChnInputPortGetBuf(&stInputChnPort,&stBufConf,&stBufInfo,&hHandle, -1))
         {
-            stBufInfo.stFrameData.eCompressMode = E_MI_SYS_COMPRESS_MODE_NONE;
-            stBufInfo.stFrameData.eFieldType    = E_MI_SYS_FIELDTYPE_NONE;
-            stBufInfo.stFrameData.eTileMode     = E_MI_SYS_FRAME_TILE_MODE_NONE;
-            stBufInfo.bEndOfStream              = FALSE;
+            if (g_is->p_frm_yuv->width * g_is->p_frm_yuv->height < 1024 * 600) {
+                MI_SYS_FlushInvCache(g_is->vir_addr, g_is->buf_size);
+            }
 
             if (g_is->display_mode == E_MI_DISP_ROTATE_NONE)
             {
+                stBufInfo.stFrameData.eCompressMode = E_MI_SYS_COMPRESS_MODE_NONE;
+                stBufInfo.stFrameData.eFieldType    = E_MI_SYS_FIELDTYPE_NONE;
+                stBufInfo.stFrameData.eTileMode     = E_MI_SYS_FRAME_TILE_MODE_NONE;
+                stBufInfo.bEndOfStream              = FALSE;
+
+                int length = g_is->p_frm_yuv->width * g_is->p_frm_yuv->height;
                 for (int index = 0; index < stBufInfo.stFrameData.u16Height; index ++)
                 {
-                    memcpy(stBufInfo.stFrameData.pVirAddr[0] + index * stBufInfo.stFrameData.u32Stride[0],
-                           pFrame->data[0] + index * stBufInfo.stFrameData.u16Width,
-                           stBufInfo.stFrameData.u16Width);
+                    MI_SYS_MemcpyPa(stBufInfo.stFrameData.phyAddr[0] + index * stBufInfo.stFrameData.u32Stride[0],
+                    g_is->phy_addr + index * g_is->p_frm_yuv->width, g_is->p_frm_yuv->width);
                 }
-
                 for (int index = 0; index < stBufInfo.stFrameData.u16Height / 2; index ++)
                 {
-                    memcpy(stBufInfo.stFrameData.pVirAddr[1] + index * stBufInfo.stFrameData.u32Stride[1],
-                           pFrame->data[1] + index * stBufInfo.stFrameData.u16Width,
-                           stBufInfo.stFrameData.u16Width);
+                    MI_SYS_MemcpyPa(stBufInfo.stFrameData.phyAddr[1] + index * stBufInfo.stFrameData.u32Stride[1],
+                    g_is->phy_addr + length + index * g_is->p_frm_yuv->width, g_is->p_frm_yuv->width);
                 }
             }
             else
@@ -755,7 +756,12 @@ int tp_player_open(char *fp, uint16_t x, uint16_t y, uint16_t width, uint16_t he
     memset(&o_sendevt, 0, sizeof(IPCEvent));
     o_sendevt.EventType = IPC_COMMAND_OPEN;
     strcpy(o_sendevt.stPlData.filePath, fp);
-
+    // 旋转开关
+    #if ENABLE_ROTATE
+    o_sendevt.stPlData.rotate = E_MI_DISP_ROTATE_270;
+    #else
+    o_sendevt.stPlData.rotate = E_MI_DISP_ROTATE_NONE;
+    #endif
     o_sendevt.stPlData.x = x;
     o_sendevt.stPlData.y = y;
     o_sendevt.stPlData.width  = width;

@@ -354,12 +354,12 @@ static int demux_init(player_stat_t *is)
     {
         is->playerController.fpGetCurrentPlayPosFromVideo = is->playerController.fpGetCurrentPlayPos;
         printf("get play pos from video stream\n");
-            
+
         // 提示软解视频质量不超过720P
         p_codec_par = is->p_video_stream->codecpar;
         if (p_codec_par->codec_id != AV_CODEC_ID_H264 && p_codec_par->codec_id != AV_CODEC_ID_HEVC)
         {
-            if (p_codec_par->width >= 1366 && p_codec_par->height >= 768)
+            if (p_codec_par->width * p_codec_par->height > 1280 * 720)
             {
                 av_log(NULL, AV_LOG_WARNING, "WARNNING: The resolution of video is over 720P!!!\n");
                 ret = -2;
@@ -368,7 +368,7 @@ static int demux_init(player_stat_t *is)
         }
         else
         {
-            if (p_codec_par->width > 1920 && p_codec_par->height > 1080)
+            if (p_codec_par->width * p_codec_par->height > 1920 * 1080)
             {
                 av_log(NULL, AV_LOG_WARNING, "WARNNING: The resolution of video is over 1080P!!!\n");
                 ret = -2;

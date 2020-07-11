@@ -36,7 +36,8 @@ static int alloc_for_frame(frame_t *vp, AVFrame *frame)
     }
     //av_log(NULL, AV_LOG_WARNING, "malloc for frame = %d\n", vp->buf_size);
 
-    ret = MI_SYS_MMA_Alloc((MI_U8 *)"MMU_MMA", vp->buf_size, &vp->phy_addr);
+    //ret = MI_SYS_MMA_Alloc((MI_U8 *)"MMU_MMA", vp->buf_size, &vp->phy_addr);
+    ret = MI_SYS_MMA_Alloc((MI_U8 *)"#frame", vp->buf_size, &vp->phy_addr);
     if (ret != MI_SUCCESS) {
         av_log(NULL, AV_LOG_ERROR, "MI_SYS_MMA_Alloc Falied!\n");
         return -1;
@@ -102,14 +103,14 @@ static int queue_picture(player_stat_t *is, AVFrame *src_frame, double pts, doub
     // 将AVFrame拷入队列相应位置
     if (is->decoder_type == SOFT_DECODING)
     {
-        //av_frame_move_ref(vp->frame, src_frame);
+        av_frame_move_ref(vp->frame, src_frame);
 
         //gettimeofday(&trans_start, NULL);
-        ret = alloc_for_frame(vp, src_frame);
-        if (ret < 0) {
-            av_log(NULL, AV_LOG_ERROR, "alloc_for_frame failed!\n");
-            return 0;
-        }
+        //ret = alloc_for_frame(vp, src_frame);
+        //if (ret < 0) {
+        //    av_log(NULL, AV_LOG_ERROR, "alloc_for_frame failed!\n");
+        //    return 0;
+        //}
         //gettimeofday(&trans_end, NULL);
         //time0 = ((int64_t)trans_end.tv_sec * 1000000 + trans_end.tv_usec) - ((int64_t)trans_start.tv_sec * 1000000 + trans_start.tv_usec);
         //printf("time of alloc_for_frame : %lldus\n", time0);
@@ -389,36 +390,37 @@ static int video_load_picture(player_stat_t *is, AVFrame *frame)
         memset(&stBufConf, 0, sizeof(MI_SYS_BufConf_t));
         stBufConf.eBufType              = E_MI_SYS_BUFDATA_FRAME;
         stBufConf.stFrameCfg.eFormat    = E_MI_SYS_PIXEL_FRAME_YUV_SEMIPLANAR_420;
-        stBufConf.stFrameCfg.u16Height  = is->dst_height;
-        stBufConf.stFrameCfg.u16Width   = is->dst_width;
+        if (is->display_mode != E_MI_DISP_ROTATE_NONE) {
+            stBufConf.stFrameCfg.u16Height  = is->p_frm_yuv->width;
+            stBufConf.stFrameCfg.u16Width   = is->p_frm_yuv->height;
+        } else {
+            stBufConf.stFrameCfg.u16Height  = is->p_frm_yuv->height;
+            stBufConf.stFrameCfg.u16Width   = is->p_frm_yuv->width;
+        }
         stBufConf.u32Flags              = MI_SYS_MAP_VA;
         stBufConf.stFrameCfg.stFrameBufExtraConf.u16BufHAlignment = 16;
 
         if (MI_SUCCESS == MI_SYS_ChnInputPortGetBuf(&stInputChnPort, &stBufConf, &stBufInfo, &bufHandle, 0))
         {
+            // flush需要时间分辨率大于720P就不执行该操作但是会导致图像拉丝
+            if (is->p_frm_yuv->width * is->p_frm_yuv->height < 1024 * 600) {
+                MI_SYS_FlushInvCache(is->vir_addr, is->buf_size);
+            }
+
             // GFX旋转图片
-            if (is->display_mode != 0) {
+            if (is->display_mode != E_MI_DISP_ROTATE_NONE) {
                 //gettimeofday(&time_start, NULL);
-                if (is->flush) {
-                    MI_SYS_FlushInvCache(is->vir_addr, is->buf_size);
-                }
                 sstar_video_rotate(is, stBufInfo.stFrameData.phyAddr[0], stBufInfo.stFrameData.phyAddr[1]);
                 //gettimeofday(&time_end, NULL);
 
                 //int length = stBufInfo.stFrameData.u16Height * stBufInfo.stFrameData.u32Stride[0] * 3 / 2;
                 //fwrite(stBufInfo.stFrameData.pVirAddr[0], length, 1, dump_fp);
                 //printf("stBufInfo width and height : [%d %d]\n", stBufInfo.stFrameData.u32Stride[0], stBufInfo.stFrameData.u16Height);
-            }
-            else if (is->display_mode == 0) {
+            } else {
                 stBufInfo.stFrameData.eCompressMode = E_MI_SYS_COMPRESS_MODE_NONE;
                 stBufInfo.stFrameData.eFieldType    = E_MI_SYS_FIELDTYPE_NONE;
                 stBufInfo.stFrameData.eTileMode     = E_MI_SYS_FRAME_TILE_MODE_NONE;
                 stBufInfo.bEndOfStream              = FALSE;
-
-                // 输出mjpeg时flush cache
-                if (is->flush) {
-                    MI_SYS_FlushInvCache(is->vir_addr, is->buf_size);
-                }
 
                 int length = is->p_frm_yuv->width * is->p_frm_yuv->height;
                 for (int index = 0; index < stBufInfo.stFrameData.u16Height; index ++)
@@ -742,8 +744,8 @@ static int open_video_playing(void *arg)
         //    return -1;
         //}
 
-        ret = MI_SYS_MMA_Alloc((MI_U8 *)"MMU_MMA", is->buf_size, &is->phy_addr);
-        //ret = MI_SYS_MMA_Alloc((MI_U8 *)"#rotat420", is->buf_size, &is->phy_addr);
+        //ret = MI_SYS_MMA_Alloc((MI_U8 *)"MMU_MMA", is->buf_size, &is->phy_addr);
+        ret = MI_SYS_MMA_Alloc((MI_U8 *)"#yuv420p", is->buf_size, &is->phy_addr);
         if (ret != MI_SUCCESS) {
             av_log(NULL, AV_LOG_ERROR, "MI_SYS_MMA_Alloc Falied!\n");
             return -1;
@@ -876,7 +878,7 @@ static int open_video_stream(player_stat_t *is)
         return -1;
     }
 
-    if ((is->in_width > is->in_height && p_codec_par->width < p_codec_par->height)
+    /*if ((is->in_width > is->in_height && p_codec_par->width < p_codec_par->height)
      || (is->in_width < is->in_height && p_codec_par->width > p_codec_par->height)) {
         is->display_mode = E_MI_DISP_ROTATE_270;    // 如果视频的宽高与显示屏的宽高不匹配自动旋转270度
         tmp = is->in_width;
@@ -884,10 +886,10 @@ static int open_video_stream(player_stat_t *is)
         is->in_height = tmp;                        // 交换宽高
     } else {
         is->display_mode = E_MI_DISP_ROTATE_NONE;
-    }
+    }*/
 
     if (is->decoder_type == HARD_DECODING) {
-        if (1.0 * p_codec_par->width / p_codec_par->height > 1.0 * is->in_width / is->in_height) {
+        /*if (1.0 * p_codec_par->width / p_codec_par->height > 1.0 * is->in_width / is->in_height) {
             is->out_width  = is->in_width;
             is->out_height = is->in_width * p_codec_par->height / p_codec_par->width;
             is->src_width  = FFMIN(p_codec_par->width , is->out_width);
@@ -915,17 +917,32 @@ static int open_video_stream(player_stat_t *is)
                 is->pos_x = FFMAX((is->in_width - is->out_width) / 2, 0);
                 is->pos_y = 0;
             }
-        }
+        }*/
         if (is->display_mode != E_MI_DISP_ROTATE_NONE) {
+            p_codec_ctx->flags  = FFMIN(ALIGN_BACK(is->in_height, 32), ALIGN_BACK(p_codec_par->width , 32));
+            p_codec_ctx->flags2 = FFMIN(ALIGN_BACK(is->in_width , 32), ALIGN_BACK(p_codec_par->height, 32));
+            is->out_width  = is->in_width;
+            is->out_height = is->in_height;
+            is->src_width  = FFMIN(is->out_height, p_codec_par->width);
+            is->src_height = FFMIN(is->out_width , p_codec_par->height);
+            // 使用disp旋转时需要开启tilemode
             p_codec_ctx->flags |= (1 << 17);
             av_log(NULL, AV_LOG_WARNING, "set rotate attribute!\n");
+        } else {
+            // 硬解时选择VDEC缩小画面,传入宽高,由于VDEC只能缩小这里对宽高进行判断
+            p_codec_ctx->flags  = FFMIN(ALIGN_BACK(is->in_width , 32), ALIGN_BACK(p_codec_par->width , 32));
+            p_codec_ctx->flags2 = FFMIN(ALIGN_BACK(is->in_height, 32), ALIGN_BACK(p_codec_par->height, 32));
+            is->out_width  = is->in_width;
+            is->out_height = is->in_height;
+            is->src_width  = FFMIN(is->out_width , p_codec_par->width);
+            is->src_height = FFMIN(is->out_height, p_codec_par->height);
         }
         printf("vdec out w/h = [%d %d], display x/y/w/h = [%d %d %d %d]\n", 
         (p_codec_ctx->flags & 0xFFFF), (p_codec_ctx->flags2 & 0xFFFF), is->pos_x, is->pos_y, is->out_width, is->out_height);
     }
     else {
         // 针对竖屏进行旋转设置
-        if (is->display_mode != E_MI_DISP_ROTATE_NONE) {
+        /*if (is->display_mode != E_MI_DISP_ROTATE_NONE) {
             // 根据输入信号的横竖属性设置显示窗口
             if (p_codec_ctx->width > p_codec_ctx->height) {
                 is->src_height = FFMIN(p_codec_ctx->width , is->in_width);
@@ -966,6 +983,16 @@ static int open_video_stream(player_stat_t *is)
                 is->dst_width  = FFMIN(p_codec_ctx->width, 1080);
                 is->dst_height = FFMIN(p_codec_ctx->height, 1920);
             }
+        }*/
+
+        is->out_width  = is->in_width;
+        is->out_height = is->in_height;
+        if (is->display_mode != E_MI_DISP_ROTATE_NONE) {
+            is->src_width  = FFMIN(is->out_width , p_codec_par->height);
+            is->src_height = FFMIN(is->out_height, p_codec_par->width);
+        } else {
+            is->src_width  = FFMIN(is->out_width , p_codec_par->width);
+            is->src_height = FFMIN(is->out_height, p_codec_par->height);
         }
         printf("scaler src w/h = [%d %d], dst x/y/w/h = [%d %d %d %d]\n", is->src_width, is->src_height, is->pos_x, is->pos_y, is->out_width, is->out_height);
     }
@@ -1087,7 +1114,7 @@ int my_display_set(player_stat_t *is)
         stDivpChnAttr.u32MaxHeight          = 1080;
 
         MI_DIVP_CreateChn(0, &stDivpChnAttr);
-        MI_DIVP_StartChn(0);
+		MI_DIVP_SetChnAttr(0, &stDivpChnAttr);
 
         memset(&stOutputPortAttr, 0, sizeof(MI_DIVP_OutputPortAttr_t));
         stOutputPortAttr.eCompMode          = E_MI_SYS_COMPRESS_MODE_NONE;
@@ -1095,6 +1122,7 @@ int my_display_set(player_stat_t *is)
         stOutputPortAttr.u32Width           = ALIGN_BACK(is->src_width , 32);
         stOutputPortAttr.u32Height          = ALIGN_BACK(is->src_height, 32);
         MI_DIVP_SetOutputPortAttr(0, &stOutputPortAttr);
+		MI_DIVP_StartChn(0);
 
         MI_DISP_DisableInputPort(DISP_LAYER, DISP_INPUTPORT);
         MI_DISP_SetInputPortAttr(DISP_LAYER, DISP_INPUTPORT, &stInputPortAttr);
@@ -1130,13 +1158,8 @@ int my_display_set(player_stat_t *is)
         stInputPortAttr.u16SrcHeight        = ALIGN_BACK(is->src_height, 32);
         stInputPortAttr.stDispWin.u16X      = is->pos_x;
         stInputPortAttr.stDispWin.u16Y      = is->pos_y;
-        if (is->display_mode != E_MI_DISP_ROTATE_NONE) {
-            stInputPortAttr.stDispWin.u16Width  = is->out_height;
-            stInputPortAttr.stDispWin.u16Height = is->out_width;
-        } else {
-            stInputPortAttr.stDispWin.u16Width  = is->out_width;
-            stInputPortAttr.stDispWin.u16Height = is->out_height;
-        }
+        stInputPortAttr.stDispWin.u16Width  = is->out_width;
+        stInputPortAttr.stDispWin.u16Height = is->out_height;
 
         MI_DISP_DisableInputPort(DISP_LAYER, DISP_INPUTPORT);
         MI_DISP_SetInputPortAttr(DISP_LAYER, DISP_INPUTPORT, &stInputPortAttr);
@@ -1146,6 +1169,8 @@ int my_display_set(player_stat_t *is)
         // 硬解时使用DISP旋转
         stRotateConfig.eRotateMode = is->display_mode;
     }
+
+    MI_DISP_SetVideoLayerRotateMode(DISP_LAYER, &stRotateConfig);
 
     return MI_SUCCESS;
 }
