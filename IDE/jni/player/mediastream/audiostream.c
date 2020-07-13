@@ -190,7 +190,7 @@ static void* audio_decode_thread(void *arg)
             pthread_mutex_lock(&f->mutex);
             while (f->size >= f->max_size && !f->pktq->abort_request) {
                 pthread_cond_wait(&f->cond, &f->mutex);
-                if (is->seek_flags & (1 << 5)) {
+                if (is->seek_flags & (1 << 5) || is->abort_request) {
                     break;
                 }
             }

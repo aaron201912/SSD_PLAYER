@@ -187,12 +187,14 @@ int my_player_getposition(double *position)
 
     *position = get_master_clock(ssplayer);
 
-    if(isnan(*position)) {
+    if (isnan(*position)) {
         NANOX_MARK("get invalid position time\n");
         pthread_mutex_unlock(&myplayer_mutex);
         return -1;
+    } else {
+        double start_time = ssplayer->p_fmt_ctx->start_time * av_q2d(AV_TIME_BASE_Q);
+        *position = (isnan(start_time)) ? *position : (*position - start_time);
     }
-
     pthread_mutex_unlock(&myplayer_mutex);
 
     return 0;

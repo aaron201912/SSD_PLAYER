@@ -338,7 +338,7 @@ static int demux_init(player_stat_t *is)
     {
         is->p_audio_stream = p_fmt_ctx->streams[a_idx];
         is->audio_complete = 0;
-        printf("audio codec_info_nb_frames:%d, nb_frames:%lld, probe_packet:%d\n", is->p_audio_stream->codec_info_nb_frames, is->p_audio_stream->nb_frames, is->p_audio_stream->probe_packets);
+        printf("audio codec_info_nbframes:%d, nb_frames:%lld, probe_packet:%d\n", is->p_audio_stream->codec_info_nb_frames, is->p_audio_stream->nb_frames, is->p_audio_stream->probe_packets);
         //printf("audio duration:%lld, nb_frames:%lld\n", is->p_audio_stream->duration, is->p_audio_stream->nb_frames);
     }
     if (v_idx >= 0)

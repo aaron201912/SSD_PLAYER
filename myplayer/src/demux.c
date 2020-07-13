@@ -116,10 +116,9 @@ static void * demux_thread(void *arg)
  
                 if (is->video_idx >= 0) {
                     pthread_mutex_lock(&is->video_mutex);
-					is->seek_flags |= (1 << 6);
+                    is->seek_flags |= (1 << 6);
                     packet_queue_flush(&is->video_pkt_queue);
                     packet_queue_put(&is->video_pkt_queue, &v_flush_pkt);
-                    is->seek_flags |= (1 << 6);
                     pthread_mutex_unlock(&is->video_mutex);
                     //is->p_vcodec_ctx->flags |= (d1 << 7);
                 }
@@ -341,7 +340,13 @@ static int demux_init(player_stat_t *is)
 
     if (v_idx >= 0) {
         is->p_video_stream = p_fmt_ctx->streams[v_idx];
-        is->video_complete = 0;
+
+        if (is->p_video_stream->codecpar->width <= 0 || is->p_video_stream->codecpar->height <= 0) {
+            printf("read video stream info error!\n");
+            ret = -1;
+            is->play_status = -1;
+            goto fail;
+        }
 
         if (is->p_video_stream->codecpar->codec_id != AV_CODEC_ID_H264 && is->p_video_stream->codecpar->codec_id != AV_CODEC_ID_HEVC)
         {
@@ -377,6 +382,7 @@ static int demux_init(player_stat_t *is)
                 goto fail;
             }
         }
+        is->video_complete = 0;
     }
 
     prctl(PR_SET_NAME, "demux_read");

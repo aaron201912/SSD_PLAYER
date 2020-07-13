@@ -290,7 +290,7 @@ static void* video_decode_thread(void *arg)
             pthread_mutex_lock(&f->mutex);
             while (f->size >= f->max_size && !f->pktq->abort_request) {
                 pthread_cond_wait(&f->cond, &f->mutex);
-                if (is->seek_flags & (1 << 6)) {
+                if (is->seek_flags & (1 << 6) || is->abort_request) {
                     break;
                 }
             }

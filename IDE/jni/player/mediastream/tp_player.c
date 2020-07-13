@@ -196,12 +196,11 @@ static int sstar_video_init(void)
     
     if (g_is->decode_type == SOFT_DECODING)
     {
-        MI_SYS_ChnPort_t stDivpChnPort;
         MI_DIVP_ChnAttr_t stDivpChnAttr;
         MI_DIVP_OutputPortAttr_t stOutputPortAttr;
         MI_DISP_InputPortAttr_t stInputPortAttr;
         MI_SYS_ChnPort_t stDispChnPort;
-        MI_SYS_ChnPort_t stDiVpChnPort;
+		MI_SYS_ChnPort_t stDivpChnPort;
 
         MI_GFX_Open();
 
@@ -228,7 +227,7 @@ static int sstar_video_init(void)
         stDivpChnAttr.u32MaxHeight          = 1080;
 
         MI_DIVP_CreateChn(0, &stDivpChnAttr);
-        MI_DIVP_StartChn(0);
+        MI_DIVP_SetChnAttr(0, &stDivpChnAttr);
 
         memset(&stOutputPortAttr, 0, sizeof(MI_DIVP_OutputPortAttr_t));
         stOutputPortAttr.eCompMode          = E_MI_SYS_COMPRESS_MODE_NONE;
@@ -236,6 +235,7 @@ static int sstar_video_init(void)
         stOutputPortAttr.u32Width           = ALIGN_BACK(g_is->src_width , 32);
         stOutputPortAttr.u32Height          = ALIGN_BACK(g_is->src_height, 32);
         MI_DIVP_SetOutputPortAttr(0, &stOutputPortAttr);
+		MI_DIVP_StartChn(0);
 
         MI_DISP_DisableInputPort(0, 0);
         MI_DISP_SetInputPortAttr(0, 0, &stInputPortAttr);
@@ -269,13 +269,8 @@ static int sstar_video_init(void)
         stInputPortAttr.u16SrcHeight        = ALIGN_BACK(g_is->src_height, 32);
         stInputPortAttr.stDispWin.u16X      = g_is->pos_x;
         stInputPortAttr.stDispWin.u16Y      = g_is->pos_y;
-        if (g_is->display_mode != E_MI_DISP_ROTATE_NONE) {
-            stInputPortAttr.stDispWin.u16Width  = g_is->out_height;
-            stInputPortAttr.stDispWin.u16Height = g_is->out_width;
-        } else {
-            stInputPortAttr.stDispWin.u16Width  = g_is->out_width;
-            stInputPortAttr.stDispWin.u16Height = g_is->out_height;
-        }
+        stInputPortAttr.stDispWin.u16Width  = g_is->out_width;
+        stInputPortAttr.stDispWin.u16Height = g_is->out_height;
 
         MI_DISP_DisableInputPort(0, 0);
         MI_DISP_SetInputPortAttr(0, 0, &stInputPortAttr);

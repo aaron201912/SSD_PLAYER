@@ -692,7 +692,7 @@ static MI_S32 SetVideoDisplay(void)
         stDivpChnAttr.u32MaxHeight          = 1080;
 
         MI_DIVP_CreateChn(DIVP_CHN, &stDivpChnAttr);
-        MI_DIVP_StartChn(DIVP_CHN);
+        MI_DIVP_SetChnAttr(0, &stDivpChnAttr);
 
         memset(&stOutputPortAttr, 0, sizeof(MI_DIVP_OutputPortAttr_t));
         stOutputPortAttr.eCompMode          = E_MI_SYS_COMPRESS_MODE_NONE;
@@ -700,6 +700,7 @@ static MI_S32 SetVideoDisplay(void)
         stOutputPortAttr.u32Width           = ALIGN_DOWN(g_pstPlayStat->src_width , 32);
         stOutputPortAttr.u32Height          = ALIGN_DOWN(g_pstPlayStat->src_height, 32);
         MI_DIVP_SetOutputPortAttr(0, &stOutputPortAttr);
+		MI_DIVP_StartChn(0);
 
         memset(&stDispChnPort, 0, sizeof(MI_SYS_ChnPort_t));
         stDispChnPort.eModId                = E_MI_MODULE_ID_DISP;
@@ -1331,6 +1332,7 @@ static void StartPlayStreamFile(char *pFileName)
 #ifdef SUPPORT_PLAYER_PROCESS
 	mWindow_errMsgPtr->setVisible(false);
 	ResetSpeedMode();
+	system("echo 1 > /sys/class/gpio/gpio12/value");
 
 	memset(&sendevt, 0, sizeof(IPCEvent));
     sendevt.EventType = IPC_COMMAND_OPEN;
@@ -1433,6 +1435,7 @@ static void StopPlayStreamFile()
         return;
     }
 
+    system("echo 0 > /sys/class/gpio/gpio12/value");
     g_bPlaying = false;
 	g_bPause = false;
 
