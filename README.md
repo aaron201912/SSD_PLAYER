@@ -38,6 +38,11 @@ IDE:
 	   #cloudplay功能启用开关
 	   #CONFIG_CLOUD_PLAY_SWITCH := "enable"
 	   CONFIG_CLOUD_PLAY_SWITCH :=
+
+           关闭播放器多进程功能：
+           #播放器多进程功能启用开关
+           #CONFIG_MULTIPROC_SWITCH := "enable"
+           CONFIG_MULTIPROC_SWITCH :=
 	   
 	   注：cloud play功能默认不开启，界面上默认不显示。若需启用此功能，除开启cloud play宏开关外，还需将IDE/ui目录下的main_ftu_with_cloudplay重命名为main.ftu，然后重新编译。
 	       若要使用cloud play功能，必须打开player功能开关。
