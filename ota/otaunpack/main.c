@@ -30,11 +30,14 @@
 #endif
 #include <mtd/ubi-user.h>
 
+#if USE_FB
 #include "st_fb.h"
+#endif
 #include "otaunpack.h"
 
 #define BUF_SIZE_BYTE 4096
 #define OTA_FILE_NAME_LENGTH 256
+
 
 static void _PrintHelp(void)
 {
@@ -51,88 +54,6 @@ static void _PrintHelp(void)
     printf("    otaunpack -x SStarOta.bin.gz -t /tmp\n");
     printf("Option -p [file] is to show the pictures(jpeg, png) while upgrading\n");
     printf("    otaunpack -x SStarOta.bin.gz -t /tmp -p logo.jpg\n");
-}
-static void _DrawMainBar(unsigned int barHeight, unsigned int u32Precent, unsigned int u32Color, stRect_t *pRect)
-{
-    unsigned short layerW = 0;
-    unsigned short layerH = 0;
-
-    ST_Fb_GetLayerSz(&layerW, &layerH);
-    pRect->u16Width = layerW * 618 / 1000 * u32Precent / 100;
-    pRect->u16Height = barHeight;
-    pRect->u16X = (layerW - layerW * 618 / 1000) / 2;
-    pRect->u16Y = layerH * 750 / 1000;
-    ST_Fb_FillRect(pRect, u32Color);
-
-    return;
-}
-static void _DrawSubBar(unsigned int barHeight, unsigned int u32Precent, unsigned int u32Color, stRect_t *pRect)
-{
-    unsigned short layerW = 0;
-    unsigned short layerH = 0;
-
-    ST_Fb_GetLayerSz(&layerW, &layerH);
-    pRect->u16Width = layerW * 618 / 1000 * u32Precent / 100;
-    pRect->u16Height = barHeight;
-    pRect->u16X = (layerW - layerW * 618 / 1000) / 2;
-    pRect->u16Y = layerH * 750 / 1000 - pRect->u16Height - 4;
-    ST_Fb_FillRect(pRect, u32Color);
-
-    return;
-}
-static void _DrawStaticBarMain(unsigned int barHeight, unsigned int u32Color, stRect_t *pRect)
-{
-    unsigned short layerW = 0;
-    unsigned short layerH = 0;
-
-    ST_Fb_GetLayerSz(&layerW, &layerH);
-    pRect->u16Width = layerW * 618 / 1000;
-    pRect->u16Height = barHeight;
-    pRect->u16X = (layerW - layerW * 618 / 1000) / 2;
-    pRect->u16Y = layerH * 750 / 1000;
-    ST_Fb_FillRect(pRect, u32Color);
-
-    return;
-}
-static void _DrawMainText(const char *pText, unsigned int u32Color, stRect_t *pRect)
-{
-    unsigned short layerW = 0;
-    unsigned short layerH = 0;
-
-    ST_Fb_GetLayerSz(&layerW, &layerH);
-    ST_Fb_GetFontSz(&pRect->u16Width, &pRect->u16Height);
-    pRect->u16Width *= strlen(pText);
-    ST_Fb_GetLayerSz(&layerW, &layerH);
-    pRect->u16X = (layerW - layerW * 618 / 1000) / 2;
-    pRect->u16Y = layerH * 750 / 1000 + 4;
-    ST_Fb_DrawText(pRect->u16X, pRect->u16Y, u32Color, pText);
-}
-static void _DrawStaticBarSub(unsigned int barHeight, unsigned int u32Color, stRect_t *pRect)
-{
-    unsigned short layerW = 0;
-    unsigned short layerH = 0;
-
-    ST_Fb_GetLayerSz(&layerW, &layerH);
-    pRect->u16Width = layerW * 618 / 1000;
-    pRect->u16Height = barHeight;
-    pRect->u16X = (layerW - layerW * 618 / 1000) / 2;
-    pRect->u16Y = layerH * 750 / 1000 - pRect->u16Height - 4;
-    ST_Fb_FillRect(pRect, u32Color);
-
-    return;
-}
-static void _DrawSubText(const char *pText, unsigned int u32Color, stRect_t *pRect)
-{
-    unsigned short layerW = 0;
-    unsigned short layerH = 0;
-
-    ST_Fb_GetLayerSz(&layerW, &layerH);
-    ST_Fb_GetFontSz(&pRect->u16Width, &pRect->u16Height);
-    pRect->u16Width *= strlen(pText);
-    ST_Fb_GetLayerSz(&layerW, &layerH);
-    pRect->u16X = (layerW - layerW * 618 / 1000) / 2;
-    pRect->u16Y = layerH * 750 / 1000 - pRect->u16Height - 4;
-    ST_Fb_DrawText(pRect->u16X, pRect->u16Y, u32Color, pText);
 }
 static int _OpenFile(const char *pFilePath)
 {
@@ -499,6 +420,90 @@ ERR:
 
     return s32Ret;
 }
+#if USE_FB
+static void _DrawMainBar(unsigned int barHeight, unsigned int u32Precent, unsigned int u32Color, stRect_t *pRect)
+{
+    unsigned short layerW = 0;
+    unsigned short layerH = 0;
+
+    ST_Fb_GetLayerSz(&layerW, &layerH);
+    pRect->u16Width = layerW * 618 / 1000 * u32Precent / 100;
+    pRect->u16Height = barHeight;
+    pRect->u16X = (layerW - layerW * 618 / 1000) / 2;
+    pRect->u16Y = layerH * 750 / 1000;
+    ST_Fb_FillRect(pRect, u32Color);
+
+    return;
+}
+static void _DrawSubBar(unsigned int barHeight, unsigned int u32Precent, unsigned int u32Color, stRect_t *pRect)
+{
+    unsigned short layerW = 0;
+    unsigned short layerH = 0;
+
+    ST_Fb_GetLayerSz(&layerW, &layerH);
+    pRect->u16Width = layerW * 618 / 1000 * u32Precent / 100;
+    pRect->u16Height = barHeight;
+    pRect->u16X = (layerW - layerW * 618 / 1000) / 2;
+    pRect->u16Y = layerH * 750 / 1000 - pRect->u16Height - 4;
+    ST_Fb_FillRect(pRect, u32Color);
+
+    return;
+}
+static void _DrawStaticBarMain(unsigned int barHeight, unsigned int u32Color, stRect_t *pRect)
+{
+    unsigned short layerW = 0;
+    unsigned short layerH = 0;
+
+    ST_Fb_GetLayerSz(&layerW, &layerH);
+    pRect->u16Width = layerW * 618 / 1000;
+    pRect->u16Height = barHeight;
+    pRect->u16X = (layerW - layerW * 618 / 1000) / 2;
+    pRect->u16Y = layerH * 750 / 1000;
+    ST_Fb_FillRect(pRect, u32Color);
+
+    return;
+}
+static void _DrawMainText(const char *pText, unsigned int u32Color, stRect_t *pRect)
+{
+    unsigned short layerW = 0;
+    unsigned short layerH = 0;
+
+    ST_Fb_GetLayerSz(&layerW, &layerH);
+    ST_Fb_GetFontSz(&pRect->u16Width, &pRect->u16Height);
+    pRect->u16Width *= strlen(pText);
+    ST_Fb_GetLayerSz(&layerW, &layerH);
+    pRect->u16X = (layerW - layerW * 618 / 1000) / 2;
+    pRect->u16Y = layerH * 750 / 1000 + 4;
+    ST_Fb_DrawText(pRect->u16X, pRect->u16Y, u32Color, pText);
+}
+static void _DrawStaticBarSub(unsigned int barHeight, unsigned int u32Color, stRect_t *pRect)
+{
+    unsigned short layerW = 0;
+    unsigned short layerH = 0;
+
+    ST_Fb_GetLayerSz(&layerW, &layerH);
+    pRect->u16Width = layerW * 618 / 1000;
+    pRect->u16Height = barHeight;
+    pRect->u16X = (layerW - layerW * 618 / 1000) / 2;
+    pRect->u16Y = layerH * 750 / 1000 - pRect->u16Height - 4;
+    ST_Fb_FillRect(pRect, u32Color);
+
+    return;
+}
+static void _DrawSubText(const char *pText, unsigned int u32Color, stRect_t *pRect)
+{
+    unsigned short layerW = 0;
+    unsigned short layerH = 0;
+
+    ST_Fb_GetLayerSz(&layerW, &layerH);
+    ST_Fb_GetFontSz(&pRect->u16Width, &pRect->u16Height);
+    pRect->u16Width *= strlen(pText);
+    ST_Fb_GetLayerSz(&layerW, &layerH);
+    pRect->u16X = (layerW - layerW * 618 / 1000) / 2;
+    pRect->u16Y = layerH * 750 / 1000 - pRect->u16Height - 4;
+    ST_Fb_DrawText(pRect->u16X, pRect->u16Y, u32Color, pText);
+}
+
 static void _NotifyPrecentInfo(const OTA_Process_e *process, const char *message)
 {
     char print0[128];
@@ -620,6 +625,12 @@ static void _NotifyPrecentInfo(const OTA_Process_e *process, const char *message
     stOldSubBarRect= stSubBarRect;
     stOldStaticSubBarRect = stStaticSubBarRect;
 }
+#else
+static void _NotifyPrecentInfo(const OTA_Process_e *process, const char *message)
+{
+    fprintf(stderr, "(%d%%)(%d/%d)(state sub %d)\n", process->precent_main, process->current_step, process->total_step, process->state_sub);
+}
+#endif
 int main(int argc, char **argv)
 {
     int s32Ret = 0;
@@ -627,7 +638,6 @@ int main(int argc, char **argv)
     char as8BsPatchTmpPath[64];
     char as8PicturePath[64];
     char as8DstFile[64];
-    stRect_t stRect;
     OTA_UserInterface_t stOtaApi;
 
     if (argc == 1)
@@ -674,6 +684,9 @@ int main(int argc, char **argv)
         _PrintHelp();
         return -1;
     }
+#if USE_FB
+    stRect_t stRect;
+
     ST_Fb_Init();
     if (strlen(as8PicturePath))
     {
@@ -684,6 +697,7 @@ int main(int argc, char **argv)
         ST_Fb_DrawPicture(as8PicturePath);
         ST_FB_SyncDirtyUp(&stRect);
     }
+#endif
     memset(&stOtaApi, 0, sizeof(OTA_UserInterface_t));
     if (u8UpdateChoice)
     {
@@ -716,7 +730,9 @@ int main(int argc, char **argv)
     stOtaApi.pSrcFile = as8DstFile;
     stOtaApi.pDiffPatchPath = as8BsPatchTmpPath;
     s32Ret = OtaUnPack(&stOtaApi);
+#if USE_FB
     ST_Fb_Deinit();
+#endif
 
     return s32Ret;
 }

@@ -1,7 +1,7 @@
 #ifndef __MYPNG_H__
 #define __MYPNG_H__
 #include <stdio.h>
-#include "../logo.h"
+#include "logo.h"
 
 
 #if defined(LOGO_WITH_PNG)

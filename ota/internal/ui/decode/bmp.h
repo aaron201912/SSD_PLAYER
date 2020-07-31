@@ -2,7 +2,7 @@
 #ifndef __BMP_H__
 #define __BMP_H__
 #include <stdio.h>
-#include "../logo.h"
+#include "logo.h"
 
 
 #if defined(LOGO_WITH_BMP)

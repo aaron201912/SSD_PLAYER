@@ -23,22 +23,21 @@ CFLAGS := $(GCCFLAGS) $(LOCAL_CFLAGS)
 CFLAGS += $(CODEDEFINE) -DLINUX_OS
 CFLAGS += $(foreach dir,$(INC),-I$(dir))
 
-SRC_CXX  :=  $(foreach dir,$(SUBDIRS),$(wildcard $(dir)/*.cpp))
-SRC      :=  $(foreach dir,$(SUBDIRS),$(wildcard $(dir)/*.c))
-OBJS_CXX := $(patsubst %.cpp,%.o,$(SRC_CXX))
-OBJS     := $(patsubst %.c,%.o,$(SRC))
+SRC    +=  $(foreach dir,$(SUBDIRS),$(wildcard $(dir)/*.c)) $(foreach dir,$(SUBDIRS),$(wildcard $(dir)/*.cpp))
+OBJS_CXX := $(patsubst %.cpp,%.o,$(filter %.cpp, $(SRC)))
+OBJS     := $(patsubst %.c,%.o,$(filter %.c, $(SRC)))
 
-DFILES := $(foreach dir,$(SUBDIRS),$(wildcard $(dir)/*.d))
+
+DFILES := $(foreach f,$(OBJS_CXX) $(OBJS),$(patsubst %.o,%.d,$(f)))
 sinclude $(DFILES)
-#@$(CC) $(CFLAGS) -MM $< | sed -e 's/\(.*\)\.o/\$$\(SUBDIRS\)\/\1.o/g' > $(@:.o=.d)
 
 $(OBJS):%.o:%.c
-	@echo compile $<...
-	@$(CC) $(CFLAGS) -MM $< | sed -e '1s/'"^.*"'/'"$(subst /,"'\/'",$@) : $(subst /,"'\/'",$(@:.o=.d)) $(subst /,"'\/'",$<)"'\\''/' > $(@:.o=.d)
+	@echo compile $(notdir $<)...
+	@$(CC) $(CFLAGS) -MM $< | sed -e '1s/$(notdir $@):/$(subst /,\/,$@): $(subst /,\/,$(@:.o=.d))/' > $(@:.o=.d)
 	@$(CC) $(CFLAGS) -c -ffunction-sections -fdata-sections $< -o $@
 $(OBJS_CXX):%.o:%.cpp
-	@echo compile $<...
-	@$(CXX) $(CXXFLAGS) -MM $< | sed -e '1s/'"^.*"'/'"$(subst /,"'\/'",$@) : $(subst /,"'\/'",$(@:.o=.d)) $(subst /,"'\/'",$<)"'\\''/' > $(@:.o=.d)
+	@echo compile $(notdir $<)...
+	@$(CXX) $(CXXFLAGS) -MM $< | sed -e '1s/$(notdir $@):/$(subst /,\/,$@): $(subst /,\/,$(@:.o=.d))/' > $(@:.o=.d)
 	@$(CXX) $(CXXFLAGS) -c -ffunction-sections -fdata-sections $< -o $@
 
 gen_exe:$(OBJS_CXX) $(OBJS)
@@ -54,11 +53,11 @@ endif
 gen_obj:$(OBJS_CXX) $(OBJS)
 ifneq ($(OBJS_CXX), )
 	@mkdir -p $(OUTPUT_DIR)
-	@cp $(OBJS_CXX) $(OUTPUT_DIR) -v
+	@cp $(OBJS_CXX) $(OUTPUT_DIR)
 endif
 ifneq ($(OBJS), )
 	@mkdir -p $(OUTPUT_DIR)
-	@cp $(OBJS) $(OUTPUT_DIR) -v
+	@cp $(OBJS) $(OUTPUT_DIR)
 endif
 
 gen_lib:
@@ -66,27 +65,20 @@ ifeq ($(LIB_TYPE), static)
 	@$(AR) sq lib$(LIB_NAME).a $(OBJ_FILES)
 ifneq ($(OUTPUT_DIR), )
 	@mkdir -p $(OUTPUT_DIR)
-	@mv ./lib$(LIB_NAME).a $(OUTPUT_DIR) -v
+	@mv ./lib$(LIB_NAME).a $(OUTPUT_DIR)
 endif
 endif
 ifeq ($(LIB_TYPE), dynamic)
 	@$(CC) -shared -fPIC -o lib$(LIB_NAME).so $(OBJ_FILES)
 ifneq ($(OUTPUT_DIR), )
 	@mkdir -p $(OUTPUT_DIR)
-	@mv ./lib$(LIB_NAME).so $(OUTPUT_DIR) -v
+	@mv ./lib$(LIB_NAME).so $(OUTPUT_DIR)
 endif
-endif
-ifneq ($(LIB_TYPE), )
-	@echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
-	@echo lib$(LIB_NAME) is ready!!!!!!!
-	@echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
-else
-	@echo "Error LIB_TYPE not set!!"
 endif
 
 clean_files:
-	@rm -rvf $(OBJS_CXX) $(OBJS) $(OBJS_CXX:.o=.d) $(OBJS:.o=.d)
-	@rm -rvf $(OUTPUT_DIR)
+	@rm -rf $(OBJS_CXX) $(OBJS) $(OBJS_CXX:.o=.d) $(OBJS:.o=.d)
+	@rm -rf $(OUTPUT_DIR)
 ifneq ($(EXEFILE), )
-	@rm -rvf $(OUTPUT_DIR)/$(EXEFILE)
+	@rm -rf $(OUTPUT_DIR)/$(EXEFILE)
 endif

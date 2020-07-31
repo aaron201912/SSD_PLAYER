@@ -2,7 +2,7 @@
 #define __RAW_H__
 
 #include<stdio.h> 
-#include "../logo.h"
+#include "logo.h"
 
 #if defined(LOGO_WITH_RAW)
 int load_logo_raw(char* frameBuffer,BITMAP* fb,FILE* fp);

@@ -1,6 +1,6 @@
 DB_BUILD_TOP:=$(shell pwd)
 DB_OUT_PATH:=$(DB_BUILD_TOP)/out
-DB_ALKAID_PROJ:=/home/malloc.peng/p2_sdk/project/configs/current.configs
+DB_ALKAID_PROJ:=/home/malloc.peng/203_sdk/project/configs/current.configs
 DB_3PARTY_PATH:=$(DB_BUILD_TOP)/3rdparty
 include $(DB_ALKAID_PROJ)
 -include $(MODULE)/$(MODULE).mk
@@ -14,11 +14,7 @@ STRIP := strip
 GCCFLAGS := -Wall -g
 endif
 
-ifeq ($(TOOLCHAIN), glibc)
-ifeq ($(TOOLCHAIN_VERSION), 8.2.1)
-	MODULES += otaunpack
-endif
-endif
+MODULES += otaunpack
 
 LIBS_PATH := ./internal/
 
@@ -42,18 +38,22 @@ export TARGET_OUT
 export LIBS_PATH
 export DB_3PARTY_PATH
 
-.PHONY: all lib obj clean install depend_internal depend_internal_clean depend_3rd_party $(MODULES) $(MODULES_CLEAN) $(MODULES_APP_ALL) $(MODULES_APP_CLEAN) $(MODULES_OBJS_ALL) $(MODULES_OBJS_CLEAN) $(MODULES_LIBS_ALL) $(MODULES_LIBS_CLEAN)
+.PHONY: all 3rdparty lib obj clean install depend_internal depend_internal_clean depend_3rd_party $(MODULES) $(MODULES_CLEAN) $(MODULES_APP_ALL) $(MODULES_APP_CLEAN) $(MODULES_OBJS_ALL) $(MODULES_OBJS_CLEAN) $(MODULES_LIBS_ALL) $(MODULES_LIBS_CLEAN)
 
 -include $(foreach mod,$(MODULES_IN),$(mod)/dep.mk)
 
 all:
-	$(MAKE) MODULES_IN="$(MODULES)" depend_3rd_party
-	#$(MAKE) MODULES_IN="$(MODULES)" depend_internal
-	$(MAKE) $(MODULES_APP_ALL)
+	@$(MAKE) MODULES_IN="$(MODULES)" depend_internal
+ifneq ($(MODULES_APP_ALL), )
+	@$(MAKE) $(MODULES_APP_ALL)
+endif
+
+3rdparty:
+	@$(MAKE) MODULES_IN="$(MODULES)" depend_3rd_party
+
 clean:
-	$(MAKE) $(foreach mod,$(MODULES),$(patsubst %,%_clean,$(mod)))
-	#$(MAKE) MODULES_IN="$(MODULES)" depend_internal_clean
-	@rm -rvf MakefileTmp_*
+	@$(MAKE) $(foreach mod,$(MODULES),$(patsubst %,%_clean,$(mod)))
+	@$(MAKE) MODULES_IN="$(MODULES)" depend_internal_clean
 	@rm $(DB_OUT_PATH) -rf
 	@rm ./obj/ -rf
 
@@ -63,19 +63,19 @@ install:
 
 depend_internal:
 ifneq ($(DEP), )
-	$(MAKE) $(foreach m,$(sort $(DEP)),$(m)_obj_all)
-	$(MAKE) $(foreach m,$(sort $(DEP)),$(m)_lib_all)
+	@$(MAKE) $(foreach m,$(sort $(DEP)),$(m)_obj_all)
+	@$(MAKE) $(foreach m,$(sort $(DEP)),$(m)_lib_all)
 endif
 
 depend_internal_clean:
 ifneq ($(DEP), )
-	$(MAKE) $(foreach m,$(sort $(DEP)),$(m)_obj_clean)
-	$(MAKE) $(foreach m,$(sort $(DEP)),$(m)_lib_clean)
+	@$(MAKE) $(foreach m,$(sort $(DEP)),$(m)_obj_clean)
+	#@$(MAKE) $(foreach m,$(sort $(DEP)),$(m)_lib_clean)
 endif
 
 depend_3rd_party:
 ifneq ($(3RD_PARTY_DEP), )
-	$(MAKE) $(foreach m,$(sort $(3RD_PARTY_DEP)),$(m)_3rd_party_all)
+	@$(MAKE) $(foreach m,$(sort $(3RD_PARTY_DEP)),$(m)_3rd_party_all)
 endif
 
 module_install:
@@ -87,22 +87,19 @@ ifneq ($(MODULE_REL_FILES), )
 endif
 
 $(3RD_PARTY):
-	cd $(DB_3PARTY_PATH)/$(patsubst %_3rd_party_all,%,$@)/;	\
-	var="$(TOOLCHAIN_REL)";\
-	./build.sh $${var%?};	\
-	cd -
+	@$(MAKE) -C $(DB_3PARTY_PATH)/$(patsubst %_3rd_party_all,%,$@)
 
 $(MODULES_INSTALL):
 	@$(MAKE) MODULE=$(patsubst %_install,%,$@) module_install
 
 $(MODULES):
-	$(MAKE) MODULES_IN=$@ depend_3rd_party
-	$(MAKE) MODULES_IN=$@ depend_internal
+	@$(MAKE) MODULES_IN=$@ depend_3rd_party
+	@$(MAKE) MODULES_IN=$@ depend_internal
 	@$(MAKE) $(patsubst %,%_app_all,$@)
 
 $(MODULES_CLEAN):
 	@$(MAKE) $(patsubst %_clean,%_app_clean,$@)
-	$(MAKE) MODULES_IN=$@ depend_internal_clean
+	@$(MAKE) MODULES_IN=$@ depend_internal_clean
 
 $(MODULES_APP_ALL):
 	@$(MAKE) MODULE=$(patsubst %_app_all,%,$@) -f ./MakeApp.mk all
