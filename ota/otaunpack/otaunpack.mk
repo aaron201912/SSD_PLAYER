@@ -1,2 +1,0 @@
-LINK_TYPE := static
-LOCAL_CFLAGS += -DUSE_FB=$(USE_FB)
