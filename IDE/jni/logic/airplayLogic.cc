@@ -41,10 +41,10 @@
 static MI_WLAN_Status_t status;
 static int Ss_Wlan_State(void)
 {
-	MI_WLAN_GetStatus(&status);
+	SSTAR_GetWifiCurConnStatus(&status);
 	if(status.stStaStatus.state == WPA_COMPLETED)
 	{
-		char *wlan_id = status.stStaStatus.ssid;
+		char *wlan_id = (char*)status.stStaStatus.ssid;
 		mAirplay_Text9Ptr->setText(wlan_id);
 		printf("%s %s\n", status.stStaStatus.ip_address, status.stStaStatus.ssid);
 		return 0;
