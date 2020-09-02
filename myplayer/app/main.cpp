@@ -316,9 +316,9 @@ int main(int argc, char *argv[])
                 sendevt.EventType = IPC_COMMAND_GET_POSITION;
                 sendevt.stPlData.misc = position;
                 o_server.Send(sendevt);
-                time_last.tv_sec = time_now.tv_sec;
                 //av_log(NULL, AV_LOG_WARNING, "send current position time[%0.3lf]\n", sendevt.stPlData.misc);
             }
+            time_last.tv_sec = time_now.tv_sec;
         }
 
         // 异常处理或者播放完成
