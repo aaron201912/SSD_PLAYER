@@ -617,26 +617,26 @@ static int video_load_picture(player_stat_t *is, AVFrame *frame)
                     for (int index = 0; index < stBufInfo.stFrameData.u16Height; index ++)
                     {
                         MI_SYS_MemcpyPa(stBufInfo.stFrameData.phyAddr[0] + index * stBufInfo.stFrameData.u32Stride[0], 
-                                        pstVdecInfo->stFrmInfo.phyLumaAddr + index * pstVdecInfo->stFrmInfo.u16Width,
+                                        pstVdecInfo->stFrmInfo.phyLumaAddr + index * pstVdecInfo->stFrmInfo.u16Stride,
                                         pstVdecInfo->stFrmInfo.u16Width);
                     }
                     for (int index = 0; index < stBufInfo.stFrameData.u16Height / 2; index ++)
                     {
                         MI_SYS_MemcpyPa(stBufInfo.stFrameData.phyAddr[1] + index * stBufInfo.stFrameData.u32Stride[1], 
-                                        pstVdecInfo->stFrmInfo.phyChromaAddr + index * pstVdecInfo->stFrmInfo.u16Width,
+                                        pstVdecInfo->stFrmInfo.phyChromaAddr + index * pstVdecInfo->stFrmInfo.u16Stride,
                                         pstVdecInfo->stFrmInfo.u16Width);
                     }
                 } else {
                     for (int index = 0; index < stBufInfo.stFrameData.u16Height; index ++)
                     {
                         MI_SYS_MemcpyPa(stBufInfo.stFrameData.phyAddr[0] + index * stBufInfo.stFrameData.u32Stride[0], 
-                                        stVdecBuf->stVdecBufInfo.stFrameData.phyAddr[0] + index * stVdecBuf->stVdecBufInfo.stFrameData.u16Width,
+                                        stVdecBuf->stVdecBufInfo.stFrameData.phyAddr[0] + index * stVdecBuf->stVdecBufInfo.stFrameData.u32Stride[0],
                                         stVdecBuf->stVdecBufInfo.stFrameData.u16Width);
                     }
                     for (int index = 0; index < stBufInfo.stFrameData.u16Height / 2; index ++)
                     {
                         MI_SYS_MemcpyPa(stBufInfo.stFrameData.phyAddr[1] + index * stBufInfo.stFrameData.u32Stride[1], 
-                                        stVdecBuf->stVdecBufInfo.stFrameData.phyAddr[1] + index * stVdecBuf->stVdecBufInfo.stFrameData.u16Width,
+                                        stVdecBuf->stVdecBufInfo.stFrameData.phyAddr[1] + index * stVdecBuf->stVdecBufInfo.stFrameData.u32Stride[1],
                                         stVdecBuf->stVdecBufInfo.stFrameData.u16Width);
                     }
                 }
