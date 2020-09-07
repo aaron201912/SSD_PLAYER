@@ -336,6 +336,7 @@ static int demux_init(player_stat_t *is)
     if (a_idx >= 0) {
         is->p_audio_stream = p_fmt_ctx->streams[a_idx];
         is->audio_complete = 0;
+        is->av_sync_type = AV_SYNC_AUDIO_MASTER;
     }
 
     if (v_idx >= 0) {
@@ -383,6 +384,10 @@ static int demux_init(player_stat_t *is)
             }
         }
         is->video_complete = 0;
+
+        if (a_idx < 0) {
+            is->av_sync_type = AV_SYNC_VIDEO_MASTER;
+        }
     }
 
     prctl(PR_SET_NAME, "demux_read");
