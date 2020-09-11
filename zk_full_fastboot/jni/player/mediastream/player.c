@@ -33,6 +33,7 @@
 AVPacket a_flush_pkt, v_flush_pkt;
 static int av_sync_type = AV_SYNC_AUDIO_MASTER;
 static float seek_interval = 10;
+player_stat_t *g_myplayer = NULL;
 
 //ffmpeg lib
 AvCodec_LibInfo_t AvCodecLibInfo;
@@ -733,15 +734,18 @@ player_stat_t *player_init(const char *p_input_file)
 
     //open ffmpeg lib
     OpenFFmpegLib();
-    
+
     printf("player_init start\n");
+
     is = (player_stat_t *)AvUtilLibInfo.av_mallocz(sizeof(player_stat_t));
-    if (!is)
-    {
-    	printf("av_mallocz null\n");
+    if (!is) {
+        printf("av_mallocz null\n");
         return NULL;
+    } else {
+        memset(is, 0x0, sizeof(player_stat_t));
+        g_myplayer = is;
     }
-    printf("av_mallocz success\n");
+
     is->filename = AvUtilLibInfo.av_strdup(p_input_file);
     if (is->filename == NULL)
     {
@@ -840,6 +844,9 @@ int player_deinit(player_stat_t *is)
     printf("av_free filename!\n");
     AvUtilLibInfo.av_freep(&is);
     printf("av_free is!\n");
+
+    g_myplayer = NULL;
+
     CloseFFmpegLib();
 
     return 0;

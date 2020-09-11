@@ -25,6 +25,8 @@ extern "C" {               // 告诉编译器下列代码要以C链接约定的�
 #include "mi_common_datatype.h"
 #include "mi_sys.h"
 #include "mi_sys_datatype.h"
+#include "mi_vdec.h"
+#include "mi_vdec_datatype.h"
 
 #define     SUCCESS         0
 #define     FAIL            1
@@ -323,6 +325,8 @@ typedef struct {
 
     player_control_t playerController;
 }   player_stat_t;
+
+extern player_stat_t *g_myplayer;
 
 player_stat_t *player_init(const char *p_input_file);
 int player_deinit(player_stat_t *is);

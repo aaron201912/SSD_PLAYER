@@ -149,9 +149,15 @@ static int video_decode_frame(AVCodecContext *p_codec_ctx, packet_queue_t *p_pkt
             //    发送packet的顺序是按dts递增的顺序，如IPBBPBB
             //    pkt.pos变量可以标识当前packet在视频文件中的地址偏移
             //printf("send packet to decoder!\n");
-            if (AvCodecLibInfo.avcodec_send_packet(p_codec_ctx, &pkt) == AVERROR(EAGAIN))
+            ret = AvCodecLibInfo.avcodec_send_packet(p_codec_ctx, &pkt);
+            if (ret == AVERROR(EAGAIN))
             {
                 AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR, "receive_frame and send_packet both returned EAGAIN, which is an API violation.\n");
+            }
+            else if (ret == MI_ERR_VDEC_FAILED)
+            {
+                AvUtilLibInfo.av_log(NULL, AV_LOG_ERROR, "vdec occur fatal error in decoding!\n");
+                g_myplayer->play_error = -1;
             }
             AvCodecLibInfo.av_packet_unref(&pkt);
         }
