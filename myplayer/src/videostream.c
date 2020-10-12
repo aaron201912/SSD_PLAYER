@@ -158,12 +158,12 @@ static int video_decode_frame(AVCodecContext *p_codec_ctx, packet_queue_t *p_pkt
             //if(p_pkt_queue->abort_request) {
             //    return -1;
             //}
-            pthread_mutex_lock(&g_myplayer->video_mutex);
+            /*pthread_mutex_lock(&g_myplayer->video_mutex);
             if (g_myplayer->seek_flags & (1 << 6)) {
                 pthread_mutex_unlock(&g_myplayer->video_mutex);
                 break;
             }
-            pthread_mutex_unlock(&g_myplayer->video_mutex);
+            pthread_mutex_unlock(&g_myplayer->video_mutex);*/
             // 3. 从解码器接收frame
             // 3.1 一个视频packet含一个视频frame
             //     解码器缓存一定数量的packet后，才有解码后的frame输出
@@ -211,7 +211,7 @@ static int video_decode_frame(AVCodecContext *p_codec_ctx, packet_queue_t *p_pkt
             pthread_mutex_lock(&g_myplayer->video_mutex);
             if ((g_myplayer->seek_flags & (1 << 6)) && p_codec_ctx->frame_number > 1) {
                 g_myplayer->seek_flags &= ~(1 << 6);
-                frame_queue_flush(&g_myplayer->video_frm_queue);
+                //frame_queue_flush(&g_myplayer->video_frm_queue);
             }
             pthread_mutex_unlock(&g_myplayer->video_mutex);
 
@@ -705,11 +705,11 @@ retry:
     if (is->paused)
         return 0;
 recheck:
-    while (is->seek_flags & (1 << 6)) {
+    /*while (is->seek_flags & (1 << 6)) {
         is->start_play = false;
         pthread_cond_signal(&is->video_frm_queue.cond);
         av_usleep(10 * 1000);
-    }
+    }*/
 
     while(is->no_pkt_buf && !is->abort_request) {
         av_usleep(10 * 1000);

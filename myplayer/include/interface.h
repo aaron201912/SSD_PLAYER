@@ -10,6 +10,7 @@ extern "C"{
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #define PLAYERSTATUS_NONE          0x00
 #define PLAYERSTATUS_START         0x01
